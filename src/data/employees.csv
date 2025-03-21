@@ -1,0 +1,12 @@
+id,name,skills,availability,current_workload,points
+1,Employee_1,"A,C",Thu,3,100
+2,Employee_2,"B,D",Wed,1,100
+3,Employee_3,"B,D",Wed,3,100
+4,Employee_4,"A,B",Wed,1,100
+5,Employee_5,"B,D",Wed,4,100
+6,Employee_6,"D,A",Tue,4,100
+7,Employee_7,"B,A",Mon,4,100
+8,Employee_8,"B,C",Fri,3,100
+9,Employee_9,"A,D",Mon,3,100
+10,Employee_10,"B,A",Mon,0,100
+11,Employee_11,"B,D",Fri,0,100
