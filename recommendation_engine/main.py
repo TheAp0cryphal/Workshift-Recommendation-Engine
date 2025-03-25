@@ -1,393 +1,466 @@
-import numpy as np
+"""
+=============================================================
+AI-Powered Workforce Shift Optimization Prototype
+=============================================================
+
+Project Objective:
+- Automatically assign shifts to employees based on their skills,
+  availability, and workload.
+- Penalize invalid assignments and encourage workload balance.
+- Simulate last-minute cancellations and dynamically assign replacements
+  using an ML-based ranking of employees.
+- Provide transparency via a point-based reward/penalty system.
+
+Expected Outcomes:
+✅ Automated shift scheduling based on employee availability & skill set.
+✅ Reduction in last-minute cancellations with penalties for repeat offenders.
+✅ Faster shift replacements using an ML-based ranking engine.
+✅ Fairness in workforce allocation via a point-based system.
+
+This prototype is designed for an entry-level candidate.
+It uses a simple feed-forward policy network (PyTorch) trained with REINFORCE,
+synthetic data, and matplotlib (Agg backend) to visualize training progress.
+"""
+
 import random
-import copy
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+# Set Agg backend for matplotlib (for headless systems such as WSL)
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# -----------------------------
-# 1. Employee and Data Models
-# -----------------------------
+# ----------------------------
+# Global Settings and Constants
+# ----------------------------
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+TIMES = ["Morning", "Evening"]
+SKILLS = ["Customer Service", "Technical Support", "Sales", "Management"]
+
+# ----------------------------
+# Data Models
+# ----------------------------
 class Employee:
-    def __init__(self, emp_id, skills, availability, adherence):
-        self.emp_id = emp_id
-        self.skills = skills          # e.g., {'A': True, 'B': False, 'C': True, 'D': True}
-        self.availability = availability  # 1 if available, 0 if not
-        self.adherence = adherence    # Value between 0 and 1 (1 means perfectly reliable)
-        self.workload = 0             # Hours assigned for the day
+    def __init__(self, emp_id, name, skills, availability, reliability=0.9):
+        """
+        :param skills: list of skills (subset of SKILLS)
+        :param availability: list of days employee is available (subset of DAYS)
+        """
+        self.id = emp_id
+        self.name = name
+        self.skills = skills
+        self.availability = availability  # e.g., ["Monday", "Wednesday", "Friday"]
+        self.reliability = reliability    # Probability of showing up
+        self.points = 100                 # Starting points
+        self.assigned_shifts = []         # List of shifts assigned in current schedule
 
-    def __repr__(self):
-        return (f"Emp({self.emp_id}, workload={self.workload:.1f}, "
-                f"adherence={self.adherence:.2f}, avail={self.availability})")
+    def is_available(self, day):
+        return day in self.availability
 
-# Daily shift requirements (each skill has a number of required slots)
-shift_requirements = {'A': 2, 'B': 4, 'C': 3, 'D': 1}  # Total slots: 10
+class Shift:
+    def __init__(self, shift_id, day, time, required_skill):
+        """
+        :param day: day of week (from DAYS)
+        :param time: time of day (from TIMES)
+        :param required_skill: required skill (one from SKILLS)
+        """
+        self.id = shift_id
+        self.day = day
+        self.time = time
+        self.required_skill = required_skill
+        self.assigned_employee = None
 
-# -----------------------------
-# 2. Ranking Engine Functions
-# -----------------------------
-def compute_rank(employee, skill, weights):
+# ----------------------------
+# Feature Encoding Functions
+# ----------------------------
+def encode_shift(shift):
     """
-    Compute a ranking score for an employee for a given skill.
-    Skills are binary: 1 if the employee has the skill, else 0.
-    Factors: Skill match, workload (to avoid overtime), adherence, availability.
+    Encode shift into a feature vector.
+    Features:
+      - Day one-hot (len = len(DAYS))
+      - Time one-hot (len = len(TIMES))
+      - Required skill one-hot (len = len(SKILLS))
     """
-    skill_match = 1 if employee.skills.get(skill, False) else 0
-    workload_factor = max(0, 1 - (employee.workload / 8))
-    availability = employee.availability
-    rank = (weights[0] * skill_match +
-            weights[1] * workload_factor +
-            weights[2] * employee.adherence +
-            weights[3] * availability)
-    return rank
+    day_vec = [1 if d == shift.day else 0 for d in DAYS]
+    time_vec = [1 if t == shift.time else 0 for t in TIMES]
+    skill_vec = [1 if s == shift.required_skill else 0 for s in SKILLS]
+    return np.array(day_vec + time_vec + skill_vec, dtype=np.float32)
 
-def assign_shifts(employees, shift_requirements, weights, shift_length=8):
+def encode_employee(emp, current_workload):
     """
-    Assign employees to each shift slot using the ranking function.
-    Ensures that an employee's workload does not exceed 8 hours.
+    Encode employee into a feature vector.
+    Features:
+      - Skills one-hot (len = len(SKILLS))
+      - Availability one-hot for each day (len = len(DAYS))
+      - Current workload (normalized scalar)
+      - Reliability (scalar)
+      - Points (scalar, normalized by 100)
     """
-    emp_pool = copy.deepcopy(employees)
-    assignments = {}  # {skill: [employee_id, ...]}
-    
-    for skill, slots in shift_requirements.items():
-        assignments[skill] = []
-        for _ in range(slots):
-            # Filter candidates: available, have required skill, and won't exceed 8 hours.
-            candidates = [emp for emp in emp_pool if emp.availability == 1 and 
-                          emp.skills.get(skill, False) and (emp.workload + shift_length) <= 8]
-            if not candidates:
-                assignments[skill].append(None)
-                continue
-            ranked = sorted(candidates, key=lambda e: compute_rank(e, skill, weights), reverse=True)
-            best_candidate = ranked[0]
-            best_candidate.workload += shift_length
-            assignments[skill].append(best_candidate.emp_id)
-    return assignments, emp_pool
+    skill_vec = [1 if s in emp.skills else 0 for s in SKILLS]
+    avail_vec = [1 if d in emp.availability else 0 for d in DAYS]
+    workload = np.array([current_workload], dtype=np.float32)
+    reliability = np.array([emp.reliability], dtype=np.float32)
+    points = np.array([emp.points / 100.0], dtype=np.float32)
+    return np.concatenate([np.array(skill_vec, dtype=np.float32),
+                           np.array(avail_vec, dtype=np.float32),
+                           workload, reliability, points])
 
-# -----------------------------
-# 3. Cancellation Simulation
-# -----------------------------
-def simulate_cancellations(assignments, emp_dict, cancellation_penalty=0.1):
+def get_feature_vector(shift, emp, emp_workload):
     """
-    Simulate cancellation events.
-    Each assigned employee cancels with probability = 1 - adherence.
-    On cancellation, the employee's adherence is reduced and the slot is set to None.
+    Concatenate shift and employee features.
     """
-    cancelled_slots = []  # List of (skill, slot_index)
-    for skill in assignments:
-        for idx, emp_id in enumerate(assignments[skill]):
-            if emp_id is None:
-                continue
-            employee = emp_dict[emp_id]
-            if random.random() < (1 - employee.adherence):
-                # Uncomment the following line to print cancellation events:
-                # print(f"Employee {emp_id} cancelled for skill {skill} (Adherence before: {employee.adherence:.2f}).")
-                employee.adherence = max(employee.adherence - cancellation_penalty, 0)
-                assignments[skill][idx] = None
-                cancelled_slots.append((skill, idx))
-    return assignments, cancelled_slots
+    shift_feat = encode_shift(shift)
+    emp_feat = encode_employee(emp, emp_workload)
+    return np.concatenate([shift_feat, emp_feat])
 
-def reassign_cancelled_slots(assignments, employees, cancelled_slots, weights, shift_length=8):
-    """
-    Reassign the cancelled slots using the ranking engine.
-    """
-    for skill, idx in cancelled_slots:
-        candidates = [emp for emp in employees if emp.availability == 1 and 
-                      emp.skills.get(skill, False) and (emp.workload + shift_length) <= 8]
-        if not candidates:
-            continue
-        ranked = sorted(candidates, key=lambda e: compute_rank(e, skill, weights), reverse=True)
-        best_candidate = ranked[0]
-        best_candidate.workload += shift_length
-        assignments[skill][idx] = best_candidate.emp_id
-    return assignments
+# ----------------------------
+# Policy Network (ML Model)
+# ----------------------------
+class PolicyNetwork(nn.Module):
+    def __init__(self, input_dim= (len(DAYS)+len(TIMES)+len(SKILLS)) + (len(SKILLS)+len(DAYS)+3), hidden_dim=32):
+        super(PolicyNetwork, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, 1)  # Outputs a scalar score
 
-# -----------------------------
-# 4. Global Metrics & Reward Function
-# -----------------------------
-def evaluate_schedule(assignments, employees, total_slots):
-    """
-    Evaluate the schedule based on:
-      - Coverage rate: fraction of slots filled.
-      - Workforce balance: inverse of the standard deviation of workloads.
-      - Overtime violations: number of employees working more than 8 hours.
-    """
-    filled_slots = sum(len([a for a in slot_list if a is not None]) 
-                       for slot_list in assignments.values())
-    coverage_rate = filled_slots / total_slots
-    
-    workloads = [emp.workload for emp in employees]
-    balance_score = 1 / (np.std(workloads) + 1e-5)
-    
-    overtime_violations = sum(1 for emp in employees if emp.workload > 8)
-    
-    return coverage_rate, balance_score, overtime_violations
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        score = self.fc2(x)
+        return score
 
-def compute_reward(coverage_rate, balance_score, overtime_violations, alpha=1.0, beta=1.0, gamma=1.0):
-    """
-    Compute a reward based on:
-      - High coverage (target 100%),
-      - High balance score (even workload distribution),
-      - Low overtime violations.
-    """
-    reward = (alpha * coverage_rate) + (beta * balance_score) - (gamma * overtime_violations)
-    return reward
+# ----------------------------
+# RL Environment and Training
+# ----------------------------
+class ShiftSchedulingEnv:
+    def __init__(self, employees, shifts, policy_net, optimizer):
+        self.employees = employees
+        self.shifts = shifts
+        self.policy_net = policy_net
+        self.optimizer = optimizer
 
-# -----------------------------
-# 5. Evaluation Function
-# -----------------------------
-def evaluate_parameters(weights, employees, shift_requirements, shift_length=8, cancellation_penalty=0.1):
-    """
-    Run a full simulation for one day:
-      - Assign shifts.
-      - Simulate cancellations.
-      - Reassign cancelled slots.
-      - Calculate global metrics and reward.
-    Returns the reward, final assignments, and updated employees.
-    """
-    assignments, updated_employees = assign_shifts(employees, shift_requirements, weights, shift_length)
-    emp_dict = {emp.emp_id: emp for emp in updated_employees}
-    assignments, cancelled_slots = simulate_cancellations(assignments, emp_dict, cancellation_penalty)
-    assignments = reassign_cancelled_slots(assignments, updated_employees, cancelled_slots, weights, shift_length)
-    
-    total_slots = sum(shift_requirements.values())
-    coverage_rate, balance_score, overtime_violations = evaluate_schedule(assignments, updated_employees, total_slots)
-    reward = compute_reward(coverage_rate, balance_score, overtime_violations)
-    return reward, assignments, updated_employees
+    def reset_assignments(self):
+        for emp in self.employees:
+            emp.assigned_shifts = []
+        for sh in self.shifts:
+            sh.assigned_employee = None
 
-# -----------------------------
-# 6. RL Update Function
-# -----------------------------
-def rl_update(weights, current_reward, employees, shift_requirements, num_trials=5, 
-                       learning_rate=0.05, exploration_rate=0.1, shift_length=8, cancellation_penalty=0.1):
-    """
-    Enhanced RL update function using more systematic exploration and exploitation.
-    Uses gradient-like updates and decreasing exploration over time.
-    """
-    best_weights = weights.copy()
-    best_reward = current_reward
-    
-    # Try systematic perturbations for each weight dimension
-    for i in range(len(weights)):
-        # Try increasing and decreasing each weight
-        for direction in [-1, 1]:
-            new_weights = weights.copy()
-            new_weights[i] += direction * learning_rate
-            new_weights[i] = max(0, new_weights[i])  # Keep weights non-negative
-            
-            reward, _, _ = evaluate_parameters(new_weights, employees, 
-                                              shift_requirements, shift_length, 
-                                              cancellation_penalty)
-                                              
-            if reward > best_reward:
-                best_reward = reward
-                best_weights = new_weights.copy()
-    
-    # Random exploration with controlled rate
-    for _ in range(num_trials):
-        new_weights = [w + random.uniform(-exploration_rate, exploration_rate) for w in best_weights]
-        new_weights = [max(0, w) for w in new_weights]
-        
-        reward, _, _ = evaluate_parameters(new_weights, employees, 
-                                          shift_requirements, shift_length, 
-                                          cancellation_penalty)
-                                          
-        if reward > best_reward:
-            best_reward = reward
-            best_weights = new_weights.copy()
+    def compute_reward(self, shift, emp):
+        """
+        Compute reward for assigning an employee to a shift.
+        Valid assignment: employee has the required skill and is available.
+        Reward = 1.0 plus a bonus equal to (average workload - employee workload).
+        This bonus is positive if the employee has fewer assignments than average,
+        and negative if higher, encouraging balanced assignments.
+        Invalid assignment yields -1.0.
+        """
+        valid = (shift.required_skill in emp.skills) and emp.is_available(shift.day)
+        workloads = [len(e.assigned_shifts) for e in self.employees]
+        avg_workload = np.mean(workloads) if workloads else 0
+        emp_workload = len(emp.assigned_shifts)
+        bonus = (avg_workload - emp_workload)  # more aggressive bonus/penalty
+        return (1.0 + bonus) if valid else -1.0
 
-    return best_weights, best_reward
+    def run_episode(self, training=True):
+        """
+        Run one episode: assign each shift in randomized order.
+        Returns a trajectory of (log_prob, reward) tuples.
+        """
+        self.reset_assignments()
+        trajectory = []
+        random_shifts = self.shifts[:]
+        random.shuffle(random_shifts)
+        for shift in random_shifts:
+            scores = []
+            for emp in self.employees:
+                feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
+                feat_tensor = torch.tensor(feat, dtype=torch.float32)
+                score = self.policy_net(feat_tensor)
+                scores.append(score)
+            scores_tensor = torch.stack(scores).squeeze()
+            probs = F.softmax(scores_tensor, dim=0)
+            m = torch.distributions.Categorical(probs)
+            action = m.sample()
+            log_prob = m.log_prob(action)
+            chosen_emp = self.employees[action.item()]
+            reward = self.compute_reward(shift, chosen_emp)
+            # Only assign if valid (reward > 0)
+            if reward > 0:
+                shift.assigned_employee = chosen_emp
+                chosen_emp.assigned_shifts.append(shift)
+            trajectory.append((log_prob, reward))
+        return trajectory
 
-# -----------------------------
-# 7. Employee Roster Creation
-# -----------------------------
-def create_employees(num_employees):
+    def update_policy(self, trajectory):
+        """
+        Update the policy network using REINFORCE.
+        """
+        total_reward = sum(r for (_, r) in trajectory)
+        loss = 0
+        for log_prob, _ in trajectory:
+            loss -= log_prob * total_reward
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return total_reward
+
+# ----------------------------
+# Additional Visualizations and Metrics
+# ----------------------------
+def evaluate_policy(env):
     """
-    Generate a list of employees with:
-      - Random binary skills for A, B, C, D.
-      - Random availability (70% chance available).
-      - Random adherence score between 0.5 and 1.0.
+    Evaluate the trained policy deterministically.
+    Returns: total_reward, coverage, workload_std, avg_skill_match.
+    Uses the same compute_reward for consistency.
+    """
+    env.reset_assignments()
+    total_reward = 0
+    for shift in env.shifts:
+        scores = []
+        for emp in env.employees:
+            feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
+            feat_tensor = torch.tensor(feat, dtype=torch.float32)
+            score = env.policy_net(feat_tensor)
+            scores.append(score)
+        scores_tensor = torch.stack(scores).squeeze()
+        best_action = torch.argmax(scores_tensor).item()
+        chosen_emp = env.employees[best_action]
+        rwd = env.compute_reward(shift, chosen_emp)
+        if rwd > 0:
+            shift.assigned_employee = chosen_emp
+            chosen_emp.assigned_shifts.append(shift)
+        total_reward += rwd
+    coverage = sum(1 for s in env.shifts if s.assigned_employee is not None) / len(env.shifts)
+    workloads = [len(emp.assigned_shifts) for emp in env.employees]
+    workload_std = np.std(workloads)
+    skill_matches = []
+    for s in env.shifts:
+        if s.assigned_employee:
+            match = 1.0 if (s.required_skill in s.assigned_employee.skills) else 0.0
+            skill_matches.append(match)
+    avg_skill_match = np.mean(skill_matches) if skill_matches else 0
+    return total_reward, coverage, workload_std, avg_skill_match
+
+def train_agent(env, episodes=500, eval_interval=50):
+    total_rewards = []
+    eval_rewards = []
+    eval_coverages = []
+    eval_workload_stds = []
+    eval_skill_matches = []
+    for ep in range(episodes):
+        trajectory = env.run_episode(training=True)
+        ep_reward = env.update_policy(trajectory)
+        total_rewards.append(ep_reward)
+        if (ep+1) % eval_interval == 0:
+            rwd, cov, wstd, sm = evaluate_policy(env)
+            eval_rewards.append(rwd)
+            eval_coverages.append(cov)
+            eval_workload_stds.append(wstd)
+            eval_skill_matches.append(sm)
+            print(f"Episode {ep+1}/{episodes}: Eval Reward = {rwd:.2f}, Coverage = {cov*100:.1f}%, Workload STD = {wstd:.2f}, Skill Match = {sm*100:.1f}%")
+    # Plot training rewards
+    plt.figure(figsize=(8,6))
+    plt.plot(total_rewards, label="Episode Reward")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Training Reward Progress")
+    plt.legend()
+    plt.savefig("training_rewards.png")
+    print("Saved training reward plot as 'training_rewards.png'")
+    # Plot evaluation metrics
+    fig, axs = plt.subplots(2,2, figsize=(12,10))
+    episodes_axis = np.arange(eval_interval, episodes+1, eval_interval)
+    axs[0,0].plot(episodes_axis, eval_rewards, marker="o")
+    axs[0,0].set_title("Evaluation Reward")
+    axs[0,0].set_xlabel("Episode")
+    axs[0,0].set_ylabel("Reward")
+    axs[0,1].plot(episodes_axis, [c*100 for c in eval_coverages], marker="o", color="g")
+    axs[0,1].set_title("Shift Coverage (%)")
+    axs[0,1].set_xlabel("Episode")
+    axs[0,1].set_ylabel("Coverage (%)")
+    axs[1,0].plot(episodes_axis, eval_workload_stds, marker="o", color="r")
+    axs[1,0].set_title("Workload STD")
+    axs[1,0].set_xlabel("Episode")
+    axs[1,0].set_ylabel("Std Dev")
+    axs[1,1].plot(episodes_axis, [sm*100 for sm in eval_skill_matches], marker="o", color="m")
+    axs[1,1].set_title("Average Skill Match (%)")
+    axs[1,1].set_xlabel("Episode")
+    axs[1,1].set_ylabel("Skill Match (%)")
+    plt.tight_layout()
+    plt.savefig("evaluation_metrics.png")
+    print("Saved evaluation metrics plot as 'evaluation_metrics.png'")
+    return total_rewards
+
+# ----------------------------
+# ML-Based Replacement Ranking
+# ----------------------------
+def recommend_replacement(shift, employees, policy_net):
+    """
+    Use the trained policy network to score and rank employees for a cancelled shift.
+    Returns the best candidate among those valid (has required skill and is available).
+    """
+    candidate_scores = []
+    for emp in employees:
+        feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
+        feat_tensor = torch.tensor(feat, dtype=torch.float32)
+        score = policy_net(feat_tensor).item()
+        if (shift.required_skill in emp.skills) and emp.is_available(shift.day):
+            candidate_scores.append((emp, score))
+    if candidate_scores:
+        candidate_scores.sort(key=lambda x: x[1], reverse=True)
+        return candidate_scores[0][0]
+    else:
+        return None
+
+# ----------------------------
+# Synthetic Data Generation
+# ----------------------------
+def generate_employees(n=5):
+    """
+    Generate synthetic employees.
+    Each employee has a random subset of skills and is available on a random set of days.
     """
     employees = []
-    for i in range(num_employees):
-        skills = {s: random.choice([True, False]) for s in ['A', 'B', 'C', 'D']}
-        availability = 1 if random.random() < 0.7 else 0
-        adherence = random.uniform(0.5, 1.0)
-        employees.append(Employee(emp_id=i, skills=skills, availability=availability, adherence=adherence))
+    for i in range(n):
+        num_skills = random.randint(1, len(SKILLS))
+        emp_skills = random.sample(SKILLS, num_skills)
+        avail_days = random.sample(DAYS, random.randint(3, len(DAYS)))
+        reliability = round(random.uniform(0.7, 1.0), 2)
+        employees.append(Employee(i, f"Employee_{i}", emp_skills, avail_days, reliability))
     return employees
 
-# -----------------------------
-# 8. Training and Validation Function
-# -----------------------------
-def run_simulation(num_employees, num_episodes, consistent=True):
+def generate_shifts(n=10):
     """
-    Run the training simulation for a given number of employees and episodes.
-    If 'consistent' is True, the same employee data is used across episodes.
-    Tracks metrics per episode and identifies the best run.
+    Generate synthetic shifts.
+    Each shift is assigned a random day, time, and required skill.
     """
-    weights = [1.0, 1.0, 1.0, 1.0]  # Initial ranking weights
-    if consistent:
-        baseline_employees = create_employees(num_employees)
-    
-    reward_list = []
-    coverage_list = []
-    balance_list = []
-    overtime_list = []
-    
-    best_overall_reward = -float("inf")
-    best_run_assignments = None
-    best_run_weights = None
-    best_run_employees = None
-    
-    for episode in range(num_episodes):
-        if consistent:
-            employees = copy.deepcopy(baseline_employees)
-        else:
-            employees = create_employees(num_employees)
-        
-        current_reward, assignments, updated_employees = evaluate_parameters(weights, employees, shift_requirements)
-        total_slots = sum(shift_requirements.values())
-        coverage_rate, balance_score, overtime_violations = evaluate_schedule(assignments, updated_employees, total_slots)
-        
-        reward_list.append(current_reward)
-        coverage_list.append(coverage_rate)
-        balance_list.append(balance_score)
-        overtime_list.append(overtime_violations)
-        
-        print(f"Episode {episode}: Reward={current_reward:.3f}, Coverage={coverage_rate*100:.1f}%, "
-              f"Balance Score={balance_score:.3f}, Overtime Violations={overtime_violations}, Weights={weights}")
-        
-        if current_reward > best_overall_reward:
-            best_overall_reward = current_reward
-            best_run_assignments = assignments
-            best_run_weights = weights.copy()
-            best_run_employees = updated_employees
-        
-        weights, current_reward = rl_update(weights, current_reward, employees, shift_requirements)
-    
-    print("\n--- Training Summary ---")
-    print(f"Average Reward: {np.mean(reward_list):.3f}")
-    print(f"Max Reward: {np.max(reward_list):.3f}")
-    print(f"Average Coverage: {np.mean(coverage_list)*100:.1f}%")
-    print(f"Average Balance Score: {np.mean(balance_list):.3f}")
-    print(f"Average Overtime Violations: {np.mean(overtime_list):.2f}")
-    print(f"Final Weights: {weights}")
-    
-    print("\n--- Best Run ---")
-    print(f"Best Overall Reward: {best_overall_reward:.3f}")
-    print(f"Best Weights: {best_run_weights}")
-    print("Best Run Assignments:")
-    for skill, assigned in best_run_assignments.items():
-        print(f"  Skill {skill}: {assigned}")
-    
-    return reward_list, coverage_list, balance_list, overtime_list, weights, best_overall_reward, best_run_assignments, best_run_weights, best_run_employees
+    shifts = []
+    for i in range(n):
+        day = random.choice(DAYS)
+        time = random.choice(TIMES)
+        required_skill = random.choice(SKILLS)
+        shifts.append(Shift(i, day, time, required_skill))
+    return shifts
 
-# -----------------------------
-# 9. Baseline Simulation (Fixed Weights)
-# -----------------------------
-def run_fixed_simulation(num_employees, num_episodes, fixed_weights=[1.0,1.0,1.0,1.0], consistent=True):
+# ----------------------------
+# Main Flow
+# ----------------------------
+def run_simulation(n_employees=8, n_shifts=20, episodes=5000, eval_interval=50):
     """
-    Run the simulation using fixed weights (no RL updates) to serve as a baseline.
-    """
-    if consistent:
-        baseline_employees = create_employees(num_employees)
+    Run a complete shift scheduling simulation with specified parameters.
     
-    reward_list = []
-    coverage_list = []
-    balance_list = []
-    overtime_list = []
-    
-    for episode in range(num_episodes):
-        if consistent:
-            employees = copy.deepcopy(baseline_employees)
-        else:
-            employees = create_employees(num_employees)
+    Args:
+        n_employees: Number of employees to generate
+        n_shifts: Number of shifts to generate
+        episodes: Number of training episodes
+        eval_interval: Interval for evaluation during training
         
-        reward, assignments, updated_employees = evaluate_parameters(fixed_weights, employees, shift_requirements)
-        total_slots = sum(shift_requirements.values())
-        coverage, balance, overtime = evaluate_schedule(assignments, updated_employees, total_slots)
-        
-        reward_list.append(reward)
-        coverage_list.append(coverage)
-        balance_list.append(balance)
-        overtime_list.append(overtime)
-    
-    return reward_list, coverage_list, balance_list, overtime_list
-
-# -----------------------------
-# 10. Sensitivity Analysis Function
-# -----------------------------
-def sensitivity_analysis(base_weights, employees, shift_requirements, num_trials=10, shift_length=8, cancellation_penalty=0.1):
+    Returns:
+        dict: Results including coverage, workloads, and other metrics
     """
-    Test small perturbations around base_weights and record resulting rewards.
-    """
-    sensitivity_results = []
-    for _ in range(num_trials):
-        perturbation = [w + random.uniform(-0.05, 0.05) for w in base_weights]
-        perturbation = [max(0, w) for w in perturbation]
-        reward, _, _ = evaluate_parameters(perturbation, employees, shift_requirements, shift_length, cancellation_penalty)
-        sensitivity_results.append((perturbation, reward))
-    return sensitivity_results
+    # Generate synthetic employees and shifts
+    employees = generate_employees(n=n_employees)
+    shifts = generate_shifts(n=n_shifts)
 
-# -----------------------------
-# 11. Running and Evaluating the Models
-# -----------------------------
-def rolling_average(data, window_size=5):
-    """
-    Compute a rolling (moving) average of the data using the specified window size.
-    """
-    smoothed = []
-    for i in range(len(data)):
-        start = max(0, i - window_size + 1)
-        window_data = data[start : i + 1]
-        smoothed.append(np.mean(window_data))
-    return smoothed
+    # Initialize policy network and optimizer
+    policy_net = PolicyNetwork()
+    optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
 
-# Run multiple simulations with different episode counts
-episode_counts = range(20, 201, 30)  # [20, 50, 80, 110, 140, 170, 200]
-all_rl_results = {}
-all_baseline_results = {}
+    # Create RL environment
+    env = ShiftSchedulingEnv(employees, shifts, policy_net, optimizer)
 
-for num_episodes in episode_counts:
-    print(f"\n=== Running Simulation with {num_episodes} Episodes ===")
-    
-    # Run RL simulation
-    (reward_list_rl, coverage_list_rl, balance_list_rl, overtime_list_rl,
-     final_weights, best_reward, best_assignments, best_weights, 
-     best_employees) = run_simulation(num_employees=20, num_episodes=num_episodes, consistent=True)
-    
-    # Run baseline simulation
-    baseline_results = run_fixed_simulation(
-        num_employees=20, 
-        num_episodes=num_episodes, 
-        fixed_weights=[1.0,1.0,1.0,1.0], 
-        consistent=True
-    )
-    
-    # Store results
-    all_rl_results[num_episodes] = rolling_average(reward_list_rl, window_size=5)
-    all_baseline_results[num_episodes] = rolling_average(baseline_results[0], window_size=5)
-    
-    # Create individual plot for each episode count
-    plt.figure(figsize=(10, 6))
-    plt.plot(all_rl_results[num_episodes], 
-             label='RL-Tuned', 
-             color='blue')
-    plt.plot(all_baseline_results[num_episodes], 
-             label='Baseline', 
-             color='orange', 
-             linestyle='--')
-    
-    plt.xlabel("Episode")
-    plt.ylabel("Reward (Rolling Average)")
-    plt.title(f"Reward Trend - {num_episodes} Episodes")
-    plt.legend()
-    plt.savefig(f"plots/episode_comparison_{num_episodes}.png")
-    plt.close()
+    print(f"Training RL policy for {n_employees} employees and {n_shifts} shifts...")
+    train_agent(env, episodes=episodes, eval_interval=eval_interval)
 
-# Sensitivity Analysis on Final Weights.
-print("\n--- Sensitivity Analysis ---")
-baseline_employees_sa = create_employees(20)
-sensitivity_results = sensitivity_analysis(final_weights, baseline_employees_sa, shift_requirements)
-for i, (perturb_weights, perturb_reward) in enumerate(sensitivity_results):
-    print(f"Sensitivity Test {i+1}: Weights = {perturb_weights}, Reward = {perturb_reward:.3f}")
+    # Use the trained policy to schedule shifts deterministically
+    print("\nScheduling shifts using the trained policy...")
+    env.reset_assignments()
+    for shift in shifts:
+        scores = []
+        for emp in employees:
+            feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
+            feat_tensor = torch.tensor(feat, dtype=torch.float32)
+            score = policy_net(feat_tensor)
+            scores.append(score)
+        scores_tensor = torch.stack(scores).squeeze()
+        best_action = torch.argmax(scores_tensor).item()
+        chosen_emp = employees[best_action]
+        if (shift.required_skill in chosen_emp.skills) and chosen_emp.is_available(shift.day):
+            shift.assigned_employee = chosen_emp
+            chosen_emp.assigned_shifts.append(shift)
+    valid_assignments = sum(1 for s in shifts if s.assigned_employee is not None)
+    print(f"Initial Schedule: {valid_assignments}/{len(shifts)} shifts assigned.")
+
+    # Simulate Cancellations
+    cancellation_rate = 0.3  # 30% chance for each shift to cancel
+    cancelled_shifts = []
+    for shift in shifts:
+        if shift.assigned_employee and random.random() < cancellation_rate:
+            shift.assigned_employee.points -= 10
+            shift.assigned_employee.assigned_shifts.remove(shift)
+            shift.assigned_employee = None
+            cancelled_shifts.append(shift)
+    print(f"Simulated cancellations: {len(cancelled_shifts)} shifts cancelled.")
+
+    # Use ML-based ranking to replace cancelled shifts
+    replacements = 0
+    for shift in cancelled_shifts:
+        replacement = recommend_replacement(shift, employees, policy_net)
+        if replacement:
+            shift.assigned_employee = replacement
+            replacement.assigned_shifts.append(shift)
+            replacements += 1
+    print(f"Replacements found for {replacements} out of {len(cancelled_shifts)} cancelled shifts.")
+
+    # Final Reporting
+    final_coverage = sum(1 for s in shifts if s.assigned_employee is not None)
+    workloads = [len(emp.assigned_shifts) for emp in employees]
+    
+    print("\n=== Final Results ===")
+    print(f"Total Shifts: {len(shifts)}")
+    print(f"Final Coverage: {final_coverage}/{len(shifts)} ({(final_coverage/len(shifts))*100:.1f}%)")
+    for emp in employees:
+        print(f"{emp.name}: {len(emp.assigned_shifts)} shifts, Points: {emp.points}, Reliability: {emp.reliability}")
+    
+    # Return results for analysis
+    return {
+        "n_employees": n_employees,
+        "n_shifts": n_shifts,
+        "initial_coverage": valid_assignments/len(shifts),
+        "final_coverage": final_coverage/len(shifts),
+        "cancellations": len(cancelled_shifts),
+        "replacements": replacements,
+        "workload_std": np.std(workloads),
+        "workloads": workloads
+    }
+
+if __name__ == "__main__":
+    # Set seeds for reproducibility
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    # Test with different combinations of employees and shifts
+    results = []
+    
+    # Test with varying number of employees
+    for n_emp in range(5, 6):
+        result = run_simulation(n_employees=n_emp, n_shifts=30)
+        results.append(result)
+    
+    # Test with varying number of shifts
+    #for n_shifts in [10, 15, 20, 25, 30]:
+    #    result = run_simulation(n_employees=8, n_shifts=n_shifts)
+    #    results.append(result)
+    
+    # Compare results
+    print("\n=== Comparative Results ===")
+    print("Employee Scaling:")
+    for r in results[:6]:
+        print(f"Employees: {r['n_employees']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
+    
+    print("\nShift Scaling:")
+    for r in results[6:]:
+        print(f"Shifts: {r['n_shifts']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
