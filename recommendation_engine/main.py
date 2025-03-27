@@ -148,7 +148,7 @@ class ShiftSchedulingEnv:
             
         return (1.0 + bonus + overtime_penalty) if valid else -1.0
 
-    def run_episode(self, training=True):
+    def run_episode(self):
         """
         Run one episode: assign each shift in randomized order.
         Returns a trajectory of (log_prob, reward) tuples.
@@ -158,11 +158,23 @@ class ShiftSchedulingEnv:
         random_shifts = self.prepare_random_shifts()
         
         for shift in random_shifts:
+            # Calculate scores for all employees for this shift using policy network
             scores_tensor = self.score_employees_for_shift(shift)
+            
+            # Sample an employee (action) based on softmax probability distribution
+            # Returns the chosen employee index and log probability for policy gradient
             action, log_prob = self.sample_action(scores_tensor)
+            
+            # Get the actual employee object from the selected index
             chosen_emp = self.employees[action.item()]
+            
+            # Calculate reward for this assignment based on skill match, availability and workload
             reward = self.compute_reward(shift, chosen_emp)
+            
+            # Only assign the shift if the reward is positive (valid assignment)
             self.possibly_assign_shift(shift, chosen_emp, reward)
+            
+            # Store (log_prob, reward) tuple for policy gradient updates
             trajectory.append((log_prob, reward))
         return trajectory
     
@@ -200,6 +212,7 @@ class ShiftSchedulingEnv:
         """
         Update the policy network using REINFORCE.
         """
+        # Reward is cumulative reward received after taking an action
         total_reward = sum(r for (_, r) in trajectory)
         loss = 0
         for log_prob, _ in trajectory:
@@ -213,7 +226,7 @@ class ShiftSchedulingEnv:
 # Additional Visualizations and Metrics
 # ----------------------------
 def evaluate_policy(env):
-    """Evaluate the trained policy deterministically."""
+    """Evaluate the trained policy"""
     env.reset_assignments()
     total_reward = 0
     
@@ -231,7 +244,7 @@ def evaluate_policy(env):
     return total_reward, coverage, workload_std, avg_skill_match
 
 def get_best_employee_for_shift(env, shift):
-    """Find the best employee for a shift using policy network."""
+    """Find the best employee for a shift using policy network that has been trained."""
     scores = []
     for emp in env.employees:
         feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
@@ -239,8 +252,8 @@ def get_best_employee_for_shift(env, shift):
         score = env.policy_net(feat_tensor)
         scores.append(score)
     scores_tensor = torch.stack(scores).squeeze()
-    best_action = torch.argmax(scores_tensor).item()
-    return env.employees[best_action]
+    best_employee = torch.argmax(scores_tensor).item()
+    return env.employees[best_employee]
 
 def assign_if_valid(env, shift, employee):
     """Assign employee to shift if valid and return reward."""
@@ -273,7 +286,7 @@ def train_agent(env, episodes=500, eval_interval=50):
     metrics = track_training_progress(episodes, eval_interval)
     
     for ep in range(episodes):
-        trajectory = env.run_episode(training=True)
+        trajectory = env.run_episode()
         ep_reward = env.update_policy(trajectory)
         metrics['total_rewards'].append(ep_reward)
         
@@ -295,7 +308,7 @@ def track_training_progress(episodes, eval_interval):
 
 def evaluate_and_log_progress(env, ep, episodes, eval_interval, metrics):
     """Evaluate current policy and log progress."""
-    rwd, cov, wstd, sm = evaluate_policy(env)
+    rwd, cov, wstd, sm = evaluate_policy(env) # Reward, Coverage, Workload STD, Skill Match
     metrics['eval_rewards'].append(rwd)
     metrics['eval_coverages'].append(cov)
     metrics['eval_workload_stds'].append(wstd)
@@ -357,6 +370,7 @@ def plot_evaluation_metrics(metrics, episodes, eval_interval):
     plt.tight_layout()
     plt.savefig("evaluation_metrics.png")
     print("Saved evaluation metrics plot as 'evaluation_metrics.png'")
+    print("--------------------------------------------------------")
 
 def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
     """Run a complete shift scheduling simulation with specified parameters."""
@@ -365,6 +379,8 @@ def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
     shifts = generate_shifts(n=n_shifts)
     policy_net = PolicyNetwork()
     optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+    
+    # Initialize environment
     env = ShiftSchedulingEnv(employees, shifts, policy_net, optimizer)
 
     # Train policy
@@ -373,8 +389,10 @@ def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
 
     # Create initial schedule
     print("\nScheduling shifts using the trained policy...")
-    env.reset_assignments()
-    valid_assignments = create_initial_schedule(env)
+    # Reset assignments to ensure no shifts are assigned before creating initial schedule
+    env.reset_assignments() 
+    # Test the trained policy on how well it schedules shifts
+    valid_assignments = test_trained_policy(env)
     print(f"Initial Schedule: {valid_assignments}/{len(shifts)} shifts assigned.")
 
     # Simulate cancellations
@@ -391,7 +409,7 @@ def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
     
     return results
 
-def create_initial_schedule(env):
+def test_trained_policy(env):
     """Create initial schedule using trained policy."""
     valid_assignments = 0
     for shift in env.shifts:
@@ -523,7 +541,7 @@ if __name__ == "__main__":
     
     # Test with varying number of employees
     for n_emp in range(8, 9):
-        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=500, eval_interval=50)
+        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=20000, eval_interval=500)
         results.append(result)
     
     # Test with varying number of shifts
