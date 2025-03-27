@@ -49,18 +49,18 @@ The goal of this project is to develop an intelligent system that can efficientl
 ## Prerequisites
 Install requirements.txt using `pip install -r requirements.txt`
 
-## Execution Flow
-Generate synthetic employee and shift data.
-Initialize the policy network and optimizer.
-Train the RL agent for a specified number of episodes.
-Create an initial schedule using the trained policy.
-Simulate shift cancellations.
-Attempt to find replacements for the cancelled shifts.
-Print the final results, including coverage and workload distribution.
-Save plots of the training progress and evaluation metrics in a plots directory.
-
 To run the default simulation:
 `python main.py`
+
+## Execution Flow
+Generate synthetic employee and shift data.\
+Initialize the policy network and optimizer.\
+Train the RL agent for a specified number of episodes.\
+Create an initial schedule using the trained policy.\
+Simulate shift cancellations.\
+Attempt to find replacements for the cancelled shifts.\
+Print the final results, including coverage and workload distribution.\
+Save plots of the training progress and evaluation metrics in a plots directory.\
 
 ## Project Structure
 ### The project consists of a single Python file containing the following main components:
@@ -82,39 +82,39 @@ Feature Encoding:
 The project uses one-hot encoding to represent categorical features like days, times, and skills. Employee features also include workload, reliability, and points. These encoded features are then used as input to the policy network.\
 
 Policy Network
-The PolicyNetwork is a simple feedforward neural network with one hidden layer. It takes the concatenated feature vectors of a shift and an employee as input and outputs a scalar score representing the suitability of assigning that employee to the shift.
+The PolicyNetwork is a simple feedforward neural network with one hidden layer. It takes the concatenated feature vectors of a shift and an employee as input and outputs a scalar score representing the suitability of assigning that employee to the shift.\
 
 Reinforcement Learning Environment
-The ShiftSchedulingEnv manages the interaction between the RL agent (policy network) and the scheduling task. It handles:
+The ShiftSchedulingEnv manages the interaction between the RL agent (policy network) and the scheduling task. It handles:\
 
-Resetting assignments.
-Calculating rewards for assigning employees to shifts based on validity, workload balance, and overtime.
-Running episodes where shifts are assigned in a randomized order.
-Updating the policy network using the REINFORCE algorithm based on the rewards received.
-Evaluation and Metrics
-The project evaluates the performance of the trained policy using the following metrics:
+Resetting assignments.\
+Calculating rewards for assigning employees to shifts based on validity, workload balance, and overtime.\
+Running episodes where shifts are assigned in a randomized order.\
+Updating the policy network using the REINFORCE algorithm based on the rewards received.\
+Evaluation and Metrics\
+The project evaluates the performance of the trained policy using the following metrics:\
 
-Total Reward: The cumulative reward obtained during training episodes.
-Shift Coverage: The percentage of shifts that are successfully assigned to an employee.
-Workload Standard Deviation: A measure of how evenly the shifts are distributed among employees. A lower standard deviation indicates a more balanced workload.
-Average Skill Match: The percentage of assigned shifts where the employee's skills match the required skills.
-These metrics are tracked during training and plotted to visualize the learning progress.
+Total Reward: The cumulative reward obtained during training episodes.\
+Shift Coverage: The percentage of shifts that are successfully assigned to an employee.\
+Workload Standard Deviation: A measure of how evenly the shifts are distributed among employees. A lower standard deviation indicates a more balanced workload.\
+Average Skill Match: The percentage of assigned shifts where the employee's skills match the required skills.\
+These metrics are tracked during training and plotted to visualize the learning progress.\
 
 Shift Cancellation and Replacement
-The simulation includes a basic mechanism for shift cancellations. Employees assigned to shifts might cancel based on messages (detected using the classify_text function). When a cancellation occurs, the system uses the trained policy network to recommend the best available replacement employee who meets the shift requirements.
+The simulation includes a basic mechanism for shift cancellations. Employees assigned to shifts might cancel based on messages (detected using the classify_text function). When a cancellation occurs, the system uses the trained policy network to recommend the best available replacement employee who meets the shift requirements.\
 
 Results and Visualizations
-After training, the script will print the final simulation results, including the final shift coverage and workload distribution. It will also save the following plots in a plots directory:
+After training, the script will print the final simulation results, including the final shift coverage and workload distribution. It will also save the following plots in a plots directory:\
 
-training_rewards.png: Shows the average reward obtained per evaluation interval during training.
-evaluation_metrics.png: Displays plots of evaluation reward, shift coverage, workload standard deviation, and average skill match over the training episodes.
+training_rewards.png: Shows the average reward obtained per evaluation interval during training.\
+evaluation_metrics.png: Displays plots of evaluation reward, shift coverage, workload standard deviation, and average skill match over the training episodes.\
 
 Future Enhancements
-More Sophisticated NLP for Cancellation Detection: Integrate a more robust NLP model for accurately detecting cancellations from various message formats.
-Consider Employee Preferences: Incorporate employee preferences (e.g., preferred days or times) into the reward function or policy network.
-Handle Partial Availability: Allow employees to have more granular availability (e.g., available only in the morning on a specific day).
-Dynamic Shift Requirements: Implement scenarios where shift requirements might change dynamically.
-Integration with Real-World Data: Adapt the system to work with real employee and shift data from a scheduling platform.
-More Advanced RL Algorithms: Explore the use of more advanced RL algorithms like Actor-Critic methods (e.g., A2C, A3C) for potentially faster and more stable learning.
-GUI or Web Interface: Develop a user interface to visualize the schedule and allow for manual adjustments.
+More Sophisticated NLP for Cancellation Detection: Integrate a more robust NLP model for accurately detecting cancellations from various message formats.\
+Consider Employee Preferences: Incorporate employee preferences (e.g., preferred days or times) into the reward function or policy network.\
+Handle Partial Availability: Allow employees to have more granular availability (e.g., available only in the morning on a specific day).\
+Dynamic Shift Requirements: Implement scenarios where shift requirements might change dynamically.\
+Integration with Real-World Data: Adapt the system to work with real employee and shift data from a scheduling platform.\
+More Advanced RL Algorithms: Explore the use of more advanced RL algorithms like Actor-Critic methods (e.g., A2C, A3C) for potentially faster and more stable learning.\
+GUI or Web Interface: Develop a user interface to visualize the schedule and allow for manual adjustments.\
 
