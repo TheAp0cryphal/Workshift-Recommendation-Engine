@@ -329,6 +329,9 @@ def evaluate_and_log_progress(env, ep, episodes, eval_interval, metrics):
 
 def plot_training_metrics(metrics, episodes, eval_interval):
     """Plot and save training metrics."""
+    import os
+    if not os.path.exists('plots'):
+        os.makedirs('plots')
     plot_training_rewards(metrics['total_rewards'], episodes, eval_interval)
     plot_evaluation_metrics(metrics, episodes, eval_interval)
 
@@ -344,7 +347,7 @@ def plot_training_rewards(total_rewards, episodes, eval_interval):
     plt.ylabel("Average Reward")
     plt.title("Training Reward Progress (50-Episode Average)")
     plt.legend()
-    plt.savefig("training_rewards.png")
+    plt.savefig("plots/training_rewards.png")
     print("Saved training reward plot as 'training_rewards.png'")
 
 def calculate_average_rewards(total_rewards, eval_interval):
@@ -384,7 +387,7 @@ def plot_evaluation_metrics(metrics, episodes, eval_interval):
     axs[1,1].set_ylabel("Skill Match (%)")
     
     plt.tight_layout()
-    plt.savefig("evaluation_metrics.png")
+    plt.savefig("plots/evaluation_metrics.png")
     print("Saved evaluation metrics plot as 'evaluation_metrics.png'")
     print("--------------------------------------------------------")
 
@@ -573,7 +576,7 @@ if __name__ == "__main__":
     
     # Test with varying number of employees
     for n_emp in range(11,12):
-        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=500, eval_interval=250)
+        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=10000, eval_interval=250)
         results.append(result)
     
     # Test with varying number of shifts
