@@ -1,57 +1,266 @@
 
 ![ShiftScheduler drawio](https://github.com/user-attachments/assets/87b83b80-94c5-4196-84c0-1dfe778f10fb)
 
-Shift Scheduling with Reinforcement Learning
-This project implements a reinforcement learning approach to automate shift scheduling for employees. The system uses a policy network to assign shifts based on factors such as skill match, availability, workload balance, and employee reliability.
+---
+author:
+- Tanishk Sharma
+title: "Shift Scheduling Simulation: Project Documentation"
+---
 
-Features
-Employee and Shift Models:
-Defines classes to represent employees and shifts with properties like skills, availability, and required shift skills.
+# Overview
 
-Feature Encoding:
-Encodes shift and employee data into feature vectors for the policy network.
+This document provides a comprehensive overview of a reinforcement
+learning (RL) based shift scheduling simulation. The project focuses on
+scheduling employee shifts by taking into account employee skills,
+availability, reliability, and workload balance. In addition, it handles
+shift cancellations and recommends replacements using an ML-based
+ranking mechanism.
 
-Policy Network:
-A neural network built with PyTorch that scores potential employee-shift assignments.
+# Project Structure
 
-Reinforcement Learning Environment:
-Implements the REINFORCE algorithm to train the policy network. The environment calculates rewards based on valid assignments, workload balancing, and penalties for overtime or cancellations.
+The project is modularized into the following key components:
 
-Simulation and Evaluation:
-Simulates the scheduling process, evaluates performance using metrics (shift coverage, workload standard deviation, and skill match), and generates visualizations of training progress.
+-   **Global Settings and Constants**: Definition of days, times, and
+    required skills.
 
-Cancellation Handling:
-Simulates employee cancellations and uses an NLP module for text classification to detect cancellations. Replacements are recommended using the trained policy network.
+-   **Data Models**: Classes for `Employee` and `Shift`.
 
-Requirements
-Python 3.x
+-   **Feature Encoding Functions**: Methods to convert shifts and
+    employee attributes into numerical feature vectors.
 
-PyTorch
+-   **Policy Network**: A neural network (using PyTorch) that scores
+    employee-shift pairings.
 
-NumPy
+-   **RL Environment and Training**: Implements the simulation
+    environment and uses policy gradients (REINFORCE) for training.
 
-Matplotlib
+-   **Visualization and Metrics**: Functions for evaluation, plotting
+    training progress, and computing key metrics.
 
-An NLP module providing the classify_text function
+-   **ML-Based Replacement Ranking**: Mechanism to recommend
+    replacements for cancelled shifts.
 
-Installation
-Clone the repository and install the required packages using your preferred package manager.
+-   **Synthetic Data Generation**: Functions to generate synthetic
+    employees and shifts.
 
-Usage
-Run the main simulation script to start training and scheduling. You can adjust parameters such as the number of employees, shifts, training episodes, and evaluation intervals to suit your needs.
+# Module Details
 
-Project Structure
-Data Models:
-Contains definitions for the Employee and Shift classes.
+## Global Settings and Constants
 
-Feature Encoders:
-Functions to convert shift and employee attributes into numerical feature vectors.
+**Constants:**
 
-Policy Network and Training:
-Defines the neural network architecture and implements the training loop using the REINFORCE algorithm.
+-   `DAYS`: A list of weekdays (e.g., Monday to Friday).
 
-Simulation and Evaluation:
-Functions to generate synthetic data, simulate shift scheduling, handle cancellations, recommend replacements, and visualize training metrics.
+-   `TIMES`: Time slots (e.g., Morning, Evening).
 
-Visualization:
-Generates plots for training rewards and evaluation metrics, which are saved for review.
+-   `SKILLS`: Different skills required (e.g., Customer Service,
+    Technical Support, Sales, Management).
+
+## Data Models
+
+**Employee Class:**
+
+-   **Attributes:**
+
+    -   `id` & `name`
+
+    -   `skills` (subset of SKILLS)
+
+    -   `availability` (subset of DAYS)
+
+    -   `reliability` (probability of showing up)
+
+    -   `points` (performance tracking)
+
+    -   `assigned_shifts` (list of shifts assigned)
+
+**Shift Class:**
+
+-   **Attributes:**
+
+    -   `id`, `day`, `time`
+
+    -   `required_skill`
+
+    -   `assigned_employee` (initially `None`)
+
+## Feature Encoding Functions
+
+The project provides functions to convert both shifts and employees into
+numerical feature vectors:
+
+-   `encode_shift(shift)`: One-hot encodes the day, time, and required
+    skill.
+
+-   `encode_employee(emp, current_workload)`: One-hot encodes employee
+    skills and availability, and includes workload, reliability, and
+    normalized points.
+
+-   `get_feature_vector(shift, emp, emp_workload)`: Concatenates the
+    shift and employee feature vectors.
+
+## Policy Network
+
+The `PolicyNetwork` is a simple feedforward neural network built using
+PyTorch:
+
+-   **Input Layer:** Receives the concatenated feature vector.
+
+-   **Hidden Layer:** Applies a ReLU activation function.
+
+-   **Output Layer:** Produces a scalar score that represents the
+    suitability of an employee for a given shift.
+
+## Reinforcement Learning Environment and Training
+
+The `ShiftSchedulingEnv` class encapsulates the entire scheduling
+environment:
+
+-   **Episode Execution:** Randomizes the order of shifts and assigns
+    employees based on the scores from the policy network.
+
+-   **Reward Function:** Rewards valid assignments (skill match and
+    availability) and penalizes invalid assignments and overtime.
+
+-   **Policy Update:** Uses the REINFORCE algorithm to update the
+    network weights based on the trajectory of (log probability, reward)
+    pairs.
+
+## Visualization and Metrics
+
+Several functions are provided to evaluate and visualize the training
+progress:
+
+-   `evaluate_policy`: Measures metrics such as shift coverage, workload
+    standard deviation, and skill match rate.
+
+-   `plot_training_rewards` and `plot_evaluation_metrics`: Use
+    Matplotlib to generate and save plots that display training
+    progress.
+
+## ML-Based Replacement Ranking
+
+When an employee cancels a shift, the function `recommend_replacement`
+uses the trained policy network to score potential replacement
+candidates and selects the best one from those who have the required
+skills and availability.
+
+## Synthetic Data Generation
+
+Synthetic data is generated using:
+
+-   `generate_employees(n)`: Creates employees with random subsets of
+    skills and availability.
+
+-   `generate_shifts(n)`: Generates shifts with randomly assigned day,
+    time, and required skill.
+
+# Simulation Workflow
+
+The simulation follows these steps:
+
+1.  **Initialization:** Generate synthetic data (employees and shifts)
+    and initialize the policy network along with the environment.
+
+2.  **Training:** Run multiple episodes where the policy is trained via
+    REINFORCE.
+
+3.  **Evaluation:** After training, evaluate the policy by assigning
+    shifts and measuring metrics.
+
+4.  **Handling Cancellations:** Simulate cancellations using pre-defined
+    messages and detect them with an NLP module. Penalize the employee
+    and remove the assignment.
+
+5.  **Replacement:** Recommend replacements for cancelled shifts using
+    the ML-based ranking.
+
+6.  **Reporting:** Compute final metrics such as final shift coverage,
+    workload distribution, and output comprehensive simulation results.
+
+# Usage Instructions
+
+## Dependencies
+
+The project requires the following:
+
+-   Python 3.x
+
+-   PyTorch
+
+-   NumPy
+
+-   Matplotlib
+
+-   An NLP module (`nlp_module`) for classifying cancellation messages
+
+## Running the Simulation
+
+1.  Install all dependencies.
+
+2.  Execute the main script (for example,
+    `shift_scheduling_simulation.py`) by running:
+
+    ``` {.bash language="bash"}
+    python shift_scheduling_simulation.py
+    ```
+
+3.  The script will train the RL policy, generate plots in the `plots`
+    directory, and print the simulation results.
+
+# Conclusion
+
+This project demonstrates a reinforcement learning approach to solving
+the shift scheduling problem by incorporating employee characteristics,
+skill requirements, and dynamic adjustments for cancellations. Its
+modular design allows for easy maintenance and future improvements, such
+as more sophisticated cancellation detection and adaptive scheduling
+strategies.
+
+# Appendix: Code Overview
+
+Below is an excerpt showcasing key parts of the code:
+
+``` {.python language="Python" caption="Global Constants and Data Models"}
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+TIMES = ["Morning", "Evening"]
+SKILLS = ["Customer Service", "Technical Support", "Sales", "Management"]
+
+class Employee:
+    def __init__(self, emp_id, name, skills, availability, reliability=0.9):
+        self.id = emp_id
+        self.name = name
+        self.skills = skills
+        self.availability = availability
+        self.reliability = reliability
+        self.points = 100
+        self.assigned_shifts = []
+
+class Shift:
+    def __init__(self, shift_id, day, time, required_skill):
+        self.id = shift_id
+        self.day = day
+        self.time = time
+        self.required_skill = required_skill
+        self.assigned_employee = None
+```
+
+``` {.python language="Python" caption="Feature Encoding and Policy Network"}
+def encode_shift(shift):
+    # One-hot encoding for day, time, and required skill
+    day_vec = [1 if d == shift.day else 0 for d in DAYS]
+    time_vec = [1 if t == shift.time else 0 for t in TIMES]
+    skill_vec = [1 if s == shift.required_skill else 0 for s in SKILLS]
+    return np.array(day_vec + time_vec + skill_vec, dtype=np.float32)
+
+class PolicyNetwork(nn.Module):
+    def __init__(self, input_dim, hidden_dim=32):
+        super(PolicyNetwork, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, 1)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        score = self.fc2(x)
+        return score
+```
