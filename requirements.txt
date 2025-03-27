@@ -1,4 +1,0 @@
-pandas
-numpy
-scikit-learn
-spacy  # if you choose to experiment with NLP
