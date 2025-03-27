@@ -63,23 +63,23 @@ To run the default simulation:
 `python main.py`
 
 ## Project Structure
-###The project consists of a single Python file containing the following main components:
+### The project consists of a single Python file containing the following main components:
 
-#### Global Settings and Constants: Defines lists of days, times, and skills.
-Data Models: Classes for Employee and Shift to represent the entities involved in scheduling.
-Feature Encoding Functions: Functions to convert Shift and Employee objects into numerical feature vectors.
-Policy Network: A PyTorch neural network that learns the scheduling policy.
-RL Environment and Training: The ShiftSchedulingEnv class manages the scheduling process, reward calculation, and policy updates.
-Additional Visualizations and Metrics: Functions to evaluate the policy and generate plots of training progress.
-Shift Cancellation and Replacement: Functions to simulate cancellations and recommend replacements.
-Synthetic Data Generation: Functions to create random employee and shift data.
-Main Execution Block: Sets up and runs the simulation with specified parameters.
+#### Global Settings and Constants: Defines lists of days, times, and skills.\
+Data Models: Classes for Employee and Shift to represent the entities involved in scheduling.\
+Feature Encoding Functions: Functions to convert Shift and Employee objects into numerical feature vectors.\
+Policy Network: A PyTorch neural network that learns the scheduling policy.\
+RL Environment and Training: The ShiftSchedulingEnv class manages the scheduling process, reward calculation, and policy updates.\
+Additional Visualizations and Metrics: Functions to evaluate the policy and generate plots of training progress.\
+Shift Cancellation and Replacement: Functions to simulate cancellations and recommend replacements.\
+Synthetic Data Generation: Functions to create random employee and shift data.\
+Main Execution Block: Sets up and runs the simulation with specified parameters.\
 
 #### Data Models
-Employee: Represents an employee with attributes such as id, name, skills, availability, reliability, points, and assigned_shifts.
-Shift: Represents a shift with attributes such as id, day, time, required_skill, and assigned_employee.
-Feature Encoding
-The project uses one-hot encoding to represent categorical features like days, times, and skills. Employee features also include workload, reliability, and points. These encoded features are then used as input to the policy network.
+Employee: Represents an employee with attributes such as id, name, skills, availability, reliability, points, and assigned_shifts.\
+Shift: Represents a shift with attributes such as id, day, time, required_skill, and assigned_employee.\
+Feature Encoding:
+The project uses one-hot encoding to represent categorical features like days, times, and skills. Employee features also include workload, reliability, and points. These encoded features are then used as input to the policy network.\
 
 Policy Network
 The PolicyNetwork is a simple feedforward neural network with one hidden layer. It takes the concatenated feature vectors of a shift and an employee as input and outputs a scalar score representing the suitability of assigning that employee to the shift.
