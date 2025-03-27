@@ -1,13 +1,10 @@
 
 ![ShiftScheduler drawio](https://github.com/user-attachments/assets/87b83b80-94c5-4196-84c0-1dfe778f10fb)
 
----
-author:
-- Tanishk Sharma
-title: "Shift Scheduling Simulation: Project Documentation"
----
 
-# Overview
+# "Shift Scheduling Simulation: Project Documentation"
+
+## Overview
 
 This document provides a comprehensive overview of a reinforcement
 learning (RL) based shift scheduling simulation. The project focuses on
@@ -43,9 +40,9 @@ The project is modularized into the following key components:
 -   **Synthetic Data Generation**: Functions to generate synthetic
     employees and shifts.
 
-# Module Details
+## Module Details
 
-## Global Settings and Constants
+### Global Settings and Constants
 
 **Constants:**
 
@@ -56,7 +53,7 @@ The project is modularized into the following key components:
 -   `SKILLS`: Different skills required (e.g., Customer Service,
     Technical Support, Sales, Management).
 
-## Data Models
+### Data Models
 
 **Employee Class:**
 
@@ -84,7 +81,7 @@ The project is modularized into the following key components:
 
     -   `assigned_employee` (initially `None`)
 
-## Feature Encoding Functions
+### Feature Encoding Functions
 
 The project provides functions to convert both shifts and employees into
 numerical feature vectors:
@@ -99,7 +96,7 @@ numerical feature vectors:
 -   `get_feature_vector(shift, emp, emp_workload)`: Concatenates the
     shift and employee feature vectors.
 
-## Policy Network
+### Policy Network
 
 The `PolicyNetwork` is a simple feedforward neural network built using
 PyTorch:
@@ -111,7 +108,7 @@ PyTorch:
 -   **Output Layer:** Produces a scalar score that represents the
     suitability of an employee for a given shift.
 
-## Reinforcement Learning Environment and Training
+### Reinforcement Learning Environment and Training
 
 The `ShiftSchedulingEnv` class encapsulates the entire scheduling
 environment:
@@ -126,7 +123,7 @@ environment:
     network weights based on the trajectory of (log probability, reward)
     pairs.
 
-## Visualization and Metrics
+### Visualization and Metrics
 
 Several functions are provided to evaluate and visualize the training
 progress:
@@ -138,14 +135,14 @@ progress:
     Matplotlib to generate and save plots that display training
     progress.
 
-## ML-Based Replacement Ranking
+### ML-Based Replacement Ranking
 
 When an employee cancels a shift, the function `recommend_replacement`
 uses the trained policy network to score potential replacement
 candidates and selects the best one from those who have the required
 skills and availability.
 
-## Synthetic Data Generation
+### Synthetic Data Generation
 
 Synthetic data is generated using:
 
@@ -178,9 +175,9 @@ The simulation follows these steps:
 6.  **Reporting:** Compute final metrics such as final shift coverage,
     workload distribution, and output comprehensive simulation results.
 
-# Usage Instructions
+## Usage Instructions
 
-## Dependencies
+### Dependencies
 
 The project requires the following:
 
@@ -194,7 +191,7 @@ The project requires the following:
 
 -   An NLP module (`nlp_module`) for classifying cancellation messages
 
-## Running the Simulation
+### Running the Simulation
 
 1.  Install all dependencies.
 
@@ -208,7 +205,7 @@ The project requires the following:
 3.  The script will train the RL policy, generate plots in the `plots`
     directory, and print the simulation results.
 
-# Conclusion
+## Conclusion
 
 This project demonstrates a reinforcement learning approach to solving
 the shift scheduling problem by incorporating employee characteristics,
@@ -217,50 +214,4 @@ modular design allows for easy maintenance and future improvements, such
 as more sophisticated cancellation detection and adaptive scheduling
 strategies.
 
-# Appendix: Code Overview
 
-Below is an excerpt showcasing key parts of the code:
-
-``` {.python language="Python" caption="Global Constants and Data Models"}
-DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-TIMES = ["Morning", "Evening"]
-SKILLS = ["Customer Service", "Technical Support", "Sales", "Management"]
-
-class Employee:
-    def __init__(self, emp_id, name, skills, availability, reliability=0.9):
-        self.id = emp_id
-        self.name = name
-        self.skills = skills
-        self.availability = availability
-        self.reliability = reliability
-        self.points = 100
-        self.assigned_shifts = []
-
-class Shift:
-    def __init__(self, shift_id, day, time, required_skill):
-        self.id = shift_id
-        self.day = day
-        self.time = time
-        self.required_skill = required_skill
-        self.assigned_employee = None
-```
-
-``` {.python language="Python" caption="Feature Encoding and Policy Network"}
-def encode_shift(shift):
-    # One-hot encoding for day, time, and required skill
-    day_vec = [1 if d == shift.day else 0 for d in DAYS]
-    time_vec = [1 if t == shift.time else 0 for t in TIMES]
-    skill_vec = [1 if s == shift.required_skill else 0 for s in SKILLS]
-    return np.array(day_vec + time_vec + skill_vec, dtype=np.float32)
-
-class PolicyNetwork(nn.Module):
-    def __init__(self, input_dim, hidden_dim=32):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, 1)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        score = self.fc2(x)
-        return score
-```
