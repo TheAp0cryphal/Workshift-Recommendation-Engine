@@ -2,6 +2,7 @@
 ![ShiftScheduler drawio](https://github.com/user-attachments/assets/87b83b80-94c5-4196-84c0-1dfe778f10fb)
 
 
+
 # Shift Scheduling Simulation: Project Documentation
 
 ## Overview
@@ -175,6 +176,9 @@ The simulation follows these steps:
 6.  **Reporting:** Compute final metrics such as final shift coverage,
     workload distribution, and output comprehensive simulation results.
 
+## Example Reward Progress over 5000 Episodes with (11 Employees 30 Shift Schedule)
+![image](https://github.com/user-attachments/assets/b8f7431b-7789-4c8e-9dce-25030ed09e65)
+
 ## Usage Instructions
 
 ### Dependencies
@@ -207,5 +211,6 @@ skill requirements, and dynamic adjustments for cancellations. Its
 modular design allows for easy maintenance and future improvements, such
 as more sophisticated cancellation detection and adaptive scheduling
 strategies.
+
 
 
