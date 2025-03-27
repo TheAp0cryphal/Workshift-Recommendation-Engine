@@ -285,11 +285,20 @@ def train_agent(env, episodes=500, eval_interval=50):
     """Train the policy network."""
     metrics = track_training_progress(episodes, eval_interval)
     
+    import sys
+    import select
+    
     for ep in range(episodes):
         trajectory = env.run_episode()
         ep_reward = env.update_policy(trajectory)
         metrics['total_rewards'].append(ep_reward)
         
+        # Check if user pressed Enter to stop training
+        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+            input()  # Clear the input buffer
+            print(f"Training stopped early at episode {ep+1}")
+            break
+            
         if (ep+1) % eval_interval == 0:
             evaluate_and_log_progress(env, ep, episodes, eval_interval, metrics)
     
@@ -325,7 +334,9 @@ def plot_training_rewards(total_rewards, episodes, eval_interval):
     """Plot and save training rewards chart."""
     plt.figure(figsize=(8,6))
     avg_rewards = calculate_average_rewards(total_rewards, eval_interval)
-    episodes_axis = np.arange(eval_interval, episodes+1, eval_interval)
+    # Ensure x and y arrays have matching lengths
+    num_points = len(avg_rewards)
+    episodes_axis = np.arange(eval_interval, eval_interval * (num_points + 1), eval_interval)[:num_points]
     plt.plot(episodes_axis, avg_rewards, label="Avg Reward per 50 Episodes", marker="o")
     plt.xlabel("Episode")
     plt.ylabel("Average Reward")
@@ -345,7 +356,10 @@ def calculate_average_rewards(total_rewards, eval_interval):
 def plot_evaluation_metrics(metrics, episodes, eval_interval):
     """Plot and save evaluation metrics charts."""
     fig, axs = plt.subplots(2,2, figsize=(12,10))
-    episodes_axis = np.arange(eval_interval, episodes+1, eval_interval)
+    
+    # Get actual number of evaluation points
+    num_points = len(metrics['eval_rewards'])
+    episodes_axis = np.arange(eval_interval, eval_interval * (num_points + 1), eval_interval)[:num_points]
     
     axs[0,0].plot(episodes_axis, metrics['eval_rewards'], marker="o")
     axs[0,0].set_title("Evaluation Reward")
@@ -540,12 +554,12 @@ if __name__ == "__main__":
     results = []
     
     # Test with varying number of employees
-    for n_emp in range(8, 9):
-        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=20000, eval_interval=500)
+    for n_emp in range(11,12):
+        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=20000, eval_interval=250)
         results.append(result)
     
     # Test with varying number of shifts
-    #for n_shifts in [10, 15, 20, 25, 30]:
+    # for n_shifts in [10, 15, 20, 25, 30]:
     #    result = run_simulation(n_employees=8, n_shifts=n_shifts)
     #    results.append(result)
     
@@ -555,6 +569,6 @@ if __name__ == "__main__":
     for r in results[:6]:
         print(f"Employees: {r['n_employees']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
     
-    print("\nShift Scaling:")
-    for r in results[6:]:
-        print(f"Shifts: {r['n_shifts']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
+    # print("\nShift Scaling:")
+    # for r in results[6:]:
+    #    print(f"Shifts: {r['n_shifts']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
