@@ -410,7 +410,7 @@ def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
     print(f"Initial Schedule: {valid_assignments}/{len(shifts)} shifts assigned.")
 
     # Simulate cancellations
-    cancelled_shifts = simulate_cancellations(env, cancellation_rate=0.3)
+    cancelled_shifts = simulate_cancellations(env)
     print(f"Simulated cancellations: {len(cancelled_shifts)} shifts cancelled.")
 
     # Handle replacements
@@ -440,21 +440,73 @@ def assign_employee_to_shift(shift, employee):
         employee.assigned_shifts.append(shift)
     return is_valid
 
-def simulate_cancellations(env, cancellation_rate=0.3):
-    """Simulate employee cancellations with specified rate."""
+# ----------------------------
+# Simple NLP for Cancellation Detection
+# ----------------------------
+def detect_cancellation(message: str) -> bool:
+    """
+    Use Flair for cancellation detection but configure it to reduce verbosity
+    and memory usage.
+    """
+    # Configure logging to reduce Flair's verbosity
+    import logging
+    logging.getLogger('flair').setLevel(logging.ERROR)
+    logging.getLogger('transformers').setLevel(logging.ERROR)
+    
+    # Import Flair only when needed to reduce memory footprint
+    from flair.data import Sentence
+    from flair.models import TextClassifier
+    
+    if not hasattr(detect_cancellation, "model"):
+        try:
+            detect_cancellation.model = TextClassifier.load('en-sentiment')
+        except:
+            # Fall back to a basic approach if model loading fails
+            print("Warning: Could not load Flair model. Using basic keyword detection.")
+            return any(kw in message.lower() for kw in ["cancel", "can't make", "won't be able", "sick"])
+    
+    # Create a sentence
+    sentence = Sentence(message)
+    
+    # Predict with the model
+    detect_cancellation.model.predict(sentence)
+    
+    # Check if the sentiment is negative (indicating cancellation)
+    # We may also check for explicit cancellation keywords
+    cancellation_keywords = ["cancel", "can't make", "won't be able", "sick"]
+    keyword_match = any(kw in message.lower() for kw in cancellation_keywords)
+    
+    # Return True if either negative sentiment or explicit cancellation keyword
+    return (sentence.labels[0].value == 'NEGATIVE' and sentence.labels[0].score > 0.7) or keyword_match
+
+def simulate_cancellations(env):
+    cancellation_messages = {
+        0: "I cannot make it today", # Cancellation 
+        1: "I will not be able to make it today", # Cancellation 
+        2: "All good, I'll be there", # No Cancellation
+        3: "Due to unforeseen circumstances, I am cancelling my shift", # Cancellation
+        4: "I will be coming during my shift", # No Cancellation
+        5: "I have a meeting, so I won't be available", # Cancellation
+        6: "I have a doctor's appointment, so I won't be able to make it", # Cancellation
+    }
+    
     cancelled_shifts = []
     for shift in env.shifts:
-        if shift.assigned_employee and random.random() < cancellation_rate:
-            employee = shift.assigned_employee
-            handle_cancellation(shift, employee)
+        if not shift.assigned_employee:
+            continue
+            
+        # If there's a message for this shift, check if it indicates cancellation
+        message = cancellation_messages.get(shift.id, "I'm good")
+            
+        if detect_cancellation(message):
+            print(f"Shift {shift.id} cancellation detected with message: '{message}'")
+            shift.assigned_employee.points -= 10
+            shift.assigned_employee.assigned_shifts.remove(shift)
+            shift.assigned_employee = None
             cancelled_shifts.append(shift)
+    
+    print(f"Simulated cancellations: {len(cancelled_shifts)} shifts cancelled.")
     return cancelled_shifts
-
-def handle_cancellation(shift, employee):
-    """Process an employee cancellation."""
-    employee.points -= 10
-    employee.assigned_shifts.remove(shift)
-    shift.assigned_employee = None
 
 def handle_cancelled_shifts(env, cancelled_shifts):
     """Find replacements for cancelled shifts."""
@@ -555,7 +607,7 @@ if __name__ == "__main__":
     
     # Test with varying number of employees
     for n_emp in range(11,12):
-        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=20000, eval_interval=250)
+        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=500, eval_interval=250)
         results.append(result)
     
     # Test with varying number of shifts
