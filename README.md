@@ -2,7 +2,7 @@
 ![ShiftScheduler drawio](https://github.com/user-attachments/assets/87b83b80-94c5-4196-84c0-1dfe778f10fb)
 
 
-# "Shift Scheduling Simulation: Project Documentation"
+# Shift Scheduling Simulation: Project Documentation
 
 ## Overview
 
