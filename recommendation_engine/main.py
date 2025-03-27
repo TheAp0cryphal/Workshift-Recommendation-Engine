@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-# Set Agg backend for matplotlib (for headless systems such as WSL)
+# Set Agg backend for matplotlib (for WSL)
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt

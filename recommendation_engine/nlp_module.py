@@ -1,6 +1,5 @@
 from transformers import pipeline
 
-# Load a pre-trained text classification model
 # Here we use "distilbert-base-uncased-finetuned-sst-2-english" which is fine-tuned on sentiment analysis.
 classifier = pipeline("text-classification", model="distilbert-base-uncased-finetuned-sst-2-english")
 
