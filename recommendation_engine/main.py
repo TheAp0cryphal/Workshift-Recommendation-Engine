@@ -10,6 +10,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+from nlp_module import classify_text
+
 # ----------------------------
 # Global Settings and Constants
 # ----------------------------
@@ -439,46 +441,7 @@ def assign_employee_to_shift(shift, employee):
         shift.assigned_employee = employee
         employee.assigned_shifts.append(shift)
     return is_valid
-
-# ----------------------------
-# Simple NLP for Cancellation Detection
-# ----------------------------
-def detect_cancellation(message: str) -> bool:
-    """
-    Use Flair for cancellation detection but configure it to reduce verbosity
-    and memory usage.
-    """
-    # Configure logging to reduce Flair's verbosity
-    import logging
-    logging.getLogger('flair').setLevel(logging.ERROR)
-    logging.getLogger('transformers').setLevel(logging.ERROR)
     
-    # Import Flair only when needed to reduce memory footprint
-    from flair.data import Sentence
-    from flair.models import TextClassifier
-    
-    if not hasattr(detect_cancellation, "model"):
-        try:
-            detect_cancellation.model = TextClassifier.load('en-sentiment')
-        except:
-            # Fall back to a basic approach if model loading fails
-            print("Warning: Could not load Flair model. Using basic keyword detection.")
-            return any(kw in message.lower() for kw in ["cancel", "can't make", "won't be able", "sick"])
-    
-    # Create a sentence
-    sentence = Sentence(message)
-    
-    # Predict with the model
-    detect_cancellation.model.predict(sentence)
-    
-    # Check if the sentiment is negative (indicating cancellation)
-    # We may also check for explicit cancellation keywords
-    cancellation_keywords = ["cancel", "can't make", "won't be able", "sick"]
-    keyword_match = any(kw in message.lower() for kw in cancellation_keywords)
-    
-    # Return True if either negative sentiment or explicit cancellation keyword
-    return (sentence.labels[0].value == 'NEGATIVE' and sentence.labels[0].score > 0.7) or keyword_match
-
 def simulate_cancellations(env):
     cancellation_messages = {
         0: "I cannot make it today", # Cancellation 
@@ -487,7 +450,6 @@ def simulate_cancellations(env):
         3: "Due to unforeseen circumstances, I am cancelling my shift", # Cancellation
         4: "I will be coming during my shift", # No Cancellation
         5: "I have a meeting, so I won't be available", # Cancellation
-        6: "I have a doctor's appointment, so I won't be able to make it", # Cancellation
     }
     
     cancelled_shifts = []
@@ -595,6 +557,10 @@ def generate_shifts(n=10):
         required_skill = random.choice(SKILLS)
         shifts.append(Shift(i, day, time, required_skill))
     return shifts
+
+def detect_cancellation(message):
+    """Detect if a message indicates shift cancellation"""
+    return not classify_text(message)
 
 if __name__ == "__main__":
     # Set seeds for reproducibility
