@@ -1,27 +1,3 @@
-"""
-=============================================================
-AI-Powered Workforce Shift Optimization Prototype
-=============================================================
-
-Project Objective:
-- Automatically assign shifts to employees based on their skills,
-  availability, and workload.
-- Penalize invalid assignments and encourage workload balance.
-- Simulate last-minute cancellations and dynamically assign replacements
-  using an ML-based ranking of employees.
-- Provide transparency via a point-based reward/penalty system.
-
-Expected Outcomes:
-✅ Automated shift scheduling based on employee availability & skill set.
-✅ Reduction in last-minute cancellations with penalties for repeat offenders.
-✅ Faster shift replacements using an ML-based ranking engine.
-✅ Fairness in workforce allocation via a point-based system.
-
-This prototype is designed for an entry-level candidate.
-It uses a simple feed-forward policy network (PyTorch) trained with REINFORCE,
-synthetic data, and matplotlib (Agg backend) to visualize training progress.
-"""
-
 import random
 import numpy as np
 import torch
@@ -155,13 +131,22 @@ class ShiftSchedulingEnv:
         This bonus is positive if the employee has fewer assignments than average,
         and negative if higher, encouraging balanced assignments.
         Invalid assignment yields -1.0.
+        Overtime (more than one shift per day) is penalized.
         """
         valid = (shift.required_skill in emp.skills) and emp.is_available(shift.day)
         workloads = [len(e.assigned_shifts) for e in self.employees]
         avg_workload = np.mean(workloads) if workloads else 0
         emp_workload = len(emp.assigned_shifts)
         bonus = (avg_workload - emp_workload)  # more aggressive bonus/penalty
-        return (1.0 + bonus) if valid else -1.0
+        
+        # Check for overtime (more than one shift on the same day)
+        overtime_penalty = 0
+        for assigned_shift in emp.assigned_shifts:
+            if assigned_shift.day == shift.day:
+                overtime_penalty = -0.5  # Penalty for overtime
+                break
+            
+        return (1.0 + bonus + overtime_penalty) if valid else -1.0
 
     def run_episode(self, training=True):
         """
@@ -170,28 +155,46 @@ class ShiftSchedulingEnv:
         """
         self.reset_assignments()
         trajectory = []
-        random_shifts = self.shifts[:]
-        random.shuffle(random_shifts)
+        random_shifts = self.prepare_random_shifts()
+        
         for shift in random_shifts:
-            scores = []
-            for emp in self.employees:
-                feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
-                feat_tensor = torch.tensor(feat, dtype=torch.float32)
-                score = self.policy_net(feat_tensor)
-                scores.append(score)
-            scores_tensor = torch.stack(scores).squeeze()
-            probs = F.softmax(scores_tensor, dim=0)
-            m = torch.distributions.Categorical(probs)
-            action = m.sample()
-            log_prob = m.log_prob(action)
+            scores_tensor = self.score_employees_for_shift(shift)
+            action, log_prob = self.sample_action(scores_tensor)
             chosen_emp = self.employees[action.item()]
             reward = self.compute_reward(shift, chosen_emp)
-            # Only assign if valid (reward > 0)
-            if reward > 0:
-                shift.assigned_employee = chosen_emp
-                chosen_emp.assigned_shifts.append(shift)
+            self.possibly_assign_shift(shift, chosen_emp, reward)
             trajectory.append((log_prob, reward))
         return trajectory
+    
+    def prepare_random_shifts(self):
+        """Prepare randomized shifts for an episode."""
+        random_shifts = self.shifts[:]
+        random.shuffle(random_shifts)
+        return random_shifts
+    
+    def score_employees_for_shift(self, shift):
+        """Score all employees for a given shift using policy network."""
+        scores = []
+        for emp in self.employees:
+            feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
+            feat_tensor = torch.tensor(feat, dtype=torch.float32)
+            score = self.policy_net(feat_tensor)
+            scores.append(score)
+        return torch.stack(scores).squeeze()
+    
+    def sample_action(self, scores_tensor):
+        """Sample an action from a categorical distribution of scores."""
+        probs = F.softmax(scores_tensor, dim=0)
+        m = torch.distributions.Categorical(probs)
+        action = m.sample()
+        log_prob = m.log_prob(action)
+        return action, log_prob
+    
+    def possibly_assign_shift(self, shift, employee, reward):
+        """Assign shift to employee if reward is positive."""
+        if reward > 0:
+            shift.assigned_employee = employee
+            employee.assigned_shifts.append(shift)
 
     def update_policy(self, trajectory):
         """
@@ -210,88 +213,253 @@ class ShiftSchedulingEnv:
 # Additional Visualizations and Metrics
 # ----------------------------
 def evaluate_policy(env):
-    """
-    Evaluate the trained policy deterministically.
-    Returns: total_reward, coverage, workload_std, avg_skill_match.
-    Uses the same compute_reward for consistency.
-    """
+    """Evaluate the trained policy deterministically."""
     env.reset_assignments()
     total_reward = 0
+    
+    # Assign shifts with trained policy
     for shift in env.shifts:
-        scores = []
-        for emp in env.employees:
-            feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
-            feat_tensor = torch.tensor(feat, dtype=torch.float32)
-            score = env.policy_net(feat_tensor)
-            scores.append(score)
-        scores_tensor = torch.stack(scores).squeeze()
-        best_action = torch.argmax(scores_tensor).item()
-        chosen_emp = env.employees[best_action]
-        rwd = env.compute_reward(shift, chosen_emp)
-        if rwd > 0:
-            shift.assigned_employee = chosen_emp
-            chosen_emp.assigned_shifts.append(shift)
-        total_reward += rwd
-    coverage = sum(1 for s in env.shifts if s.assigned_employee is not None) / len(env.shifts)
-    workloads = [len(emp.assigned_shifts) for emp in env.employees]
-    workload_std = np.std(workloads)
+        chosen_emp = get_best_employee_for_shift(env, shift)
+        reward = assign_if_valid(env, shift, chosen_emp)
+        total_reward += reward
+    
+    # Calculate evaluation metrics
+    coverage = calculate_coverage(env.shifts)
+    workload_std = calculate_workload_std(env.employees)
+    avg_skill_match = calculate_skill_match(env.shifts)
+    
+    return total_reward, coverage, workload_std, avg_skill_match
+
+def get_best_employee_for_shift(env, shift):
+    """Find the best employee for a shift using policy network."""
+    scores = []
+    for emp in env.employees:
+        feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
+        feat_tensor = torch.tensor(feat, dtype=torch.float32)
+        score = env.policy_net(feat_tensor)
+        scores.append(score)
+    scores_tensor = torch.stack(scores).squeeze()
+    best_action = torch.argmax(scores_tensor).item()
+    return env.employees[best_action]
+
+def assign_if_valid(env, shift, employee):
+    """Assign employee to shift if valid and return reward."""
+    reward = env.compute_reward(shift, employee)
+    if reward > 0:
+        shift.assigned_employee = employee
+        employee.assigned_shifts.append(shift)
+    return reward
+
+def calculate_coverage(shifts):
+    """Calculate percentage of shifts that are assigned."""
+    return sum(1 for s in shifts if s.assigned_employee is not None) / len(shifts)
+
+def calculate_workload_std(employees):
+    """Calculate standard deviation of employee workloads."""
+    workloads = [len(emp.assigned_shifts) for emp in employees]
+    return np.std(workloads)
+
+def calculate_skill_match(shifts):
+    """Calculate average skill match rate."""
     skill_matches = []
-    for s in env.shifts:
+    for s in shifts:
         if s.assigned_employee:
             match = 1.0 if (s.required_skill in s.assigned_employee.skills) else 0.0
             skill_matches.append(match)
-    avg_skill_match = np.mean(skill_matches) if skill_matches else 0
-    return total_reward, coverage, workload_std, avg_skill_match
+    return np.mean(skill_matches) if skill_matches else 0
 
 def train_agent(env, episodes=500, eval_interval=50):
-    total_rewards = []
-    eval_rewards = []
-    eval_coverages = []
-    eval_workload_stds = []
-    eval_skill_matches = []
+    """Train the policy network."""
+    metrics = track_training_progress(episodes, eval_interval)
+    
     for ep in range(episodes):
         trajectory = env.run_episode(training=True)
         ep_reward = env.update_policy(trajectory)
-        total_rewards.append(ep_reward)
+        metrics['total_rewards'].append(ep_reward)
+        
         if (ep+1) % eval_interval == 0:
-            rwd, cov, wstd, sm = evaluate_policy(env)
-            eval_rewards.append(rwd)
-            eval_coverages.append(cov)
-            eval_workload_stds.append(wstd)
-            eval_skill_matches.append(sm)
-            print(f"Episode {ep+1}/{episodes}: Eval Reward = {rwd:.2f}, Coverage = {cov*100:.1f}%, Workload STD = {wstd:.2f}, Skill Match = {sm*100:.1f}%")
-    # Plot training rewards
+            evaluate_and_log_progress(env, ep, episodes, eval_interval, metrics)
+    
+    plot_training_metrics(metrics, episodes, eval_interval)
+    return metrics['total_rewards']
+
+def track_training_progress(episodes, eval_interval):
+    """Initialize data structures to track training progress."""
+    return {
+        'total_rewards': [],
+        'eval_rewards': [],
+        'eval_coverages': [],
+        'eval_workload_stds': [],
+        'eval_skill_matches': []
+    }
+
+def evaluate_and_log_progress(env, ep, episodes, eval_interval, metrics):
+    """Evaluate current policy and log progress."""
+    rwd, cov, wstd, sm = evaluate_policy(env)
+    metrics['eval_rewards'].append(rwd)
+    metrics['eval_coverages'].append(cov)
+    metrics['eval_workload_stds'].append(wstd)
+    metrics['eval_skill_matches'].append(sm)
+    print(f"Episode {ep+1}/{episodes}: Eval Reward = {rwd:.2f}, Coverage = {cov*100:.1f}%, "
+          f"Workload STD = {wstd:.2f}, Skill Match = {sm*100:.1f}%")
+
+def plot_training_metrics(metrics, episodes, eval_interval):
+    """Plot and save training metrics."""
+    plot_training_rewards(metrics['total_rewards'], episodes, eval_interval)
+    plot_evaluation_metrics(metrics, episodes, eval_interval)
+
+def plot_training_rewards(total_rewards, episodes, eval_interval):
+    """Plot and save training rewards chart."""
     plt.figure(figsize=(8,6))
-    plt.plot(total_rewards, label="Episode Reward")
+    avg_rewards = calculate_average_rewards(total_rewards, eval_interval)
+    episodes_axis = np.arange(eval_interval, episodes+1, eval_interval)
+    plt.plot(episodes_axis, avg_rewards, label="Avg Reward per 50 Episodes", marker="o")
     plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title("Training Reward Progress")
+    plt.ylabel("Average Reward")
+    plt.title("Training Reward Progress (50-Episode Average)")
     plt.legend()
     plt.savefig("training_rewards.png")
     print("Saved training reward plot as 'training_rewards.png'")
-    # Plot evaluation metrics
+
+def calculate_average_rewards(total_rewards, eval_interval):
+    """Calculate average rewards over evaluation intervals."""
+    avg_rewards = []
+    for i in range(0, len(total_rewards), eval_interval):
+        chunk = total_rewards[i:i+eval_interval]
+        avg_rewards.append(np.mean(chunk))
+    return avg_rewards
+
+def plot_evaluation_metrics(metrics, episodes, eval_interval):
+    """Plot and save evaluation metrics charts."""
     fig, axs = plt.subplots(2,2, figsize=(12,10))
     episodes_axis = np.arange(eval_interval, episodes+1, eval_interval)
-    axs[0,0].plot(episodes_axis, eval_rewards, marker="o")
+    
+    axs[0,0].plot(episodes_axis, metrics['eval_rewards'], marker="o")
     axs[0,0].set_title("Evaluation Reward")
     axs[0,0].set_xlabel("Episode")
     axs[0,0].set_ylabel("Reward")
-    axs[0,1].plot(episodes_axis, [c*100 for c in eval_coverages], marker="o", color="g")
+    
+    axs[0,1].plot(episodes_axis, [c*100 for c in metrics['eval_coverages']], marker="o", color="g")
     axs[0,1].set_title("Shift Coverage (%)")
     axs[0,1].set_xlabel("Episode")
     axs[0,1].set_ylabel("Coverage (%)")
-    axs[1,0].plot(episodes_axis, eval_workload_stds, marker="o", color="r")
+    
+    axs[1,0].plot(episodes_axis, metrics['eval_workload_stds'], marker="o", color="r")
     axs[1,0].set_title("Workload STD")
     axs[1,0].set_xlabel("Episode")
     axs[1,0].set_ylabel("Std Dev")
-    axs[1,1].plot(episodes_axis, [sm*100 for sm in eval_skill_matches], marker="o", color="m")
+    
+    axs[1,1].plot(episodes_axis, [sm*100 for sm in metrics['eval_skill_matches']], marker="o", color="m")
     axs[1,1].set_title("Average Skill Match (%)")
     axs[1,1].set_xlabel("Episode")
     axs[1,1].set_ylabel("Skill Match (%)")
+    
     plt.tight_layout()
     plt.savefig("evaluation_metrics.png")
     print("Saved evaluation metrics plot as 'evaluation_metrics.png'")
-    return total_rewards
+
+def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
+    """Run a complete shift scheduling simulation with specified parameters."""
+    # Generate data and initialize components
+    employees = generate_employees(n=n_employees)
+    shifts = generate_shifts(n=n_shifts)
+    policy_net = PolicyNetwork()
+    optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+    env = ShiftSchedulingEnv(employees, shifts, policy_net, optimizer)
+
+    # Train policy
+    print(f"Training RL policy for {n_employees} employees and {n_shifts} shifts...")
+    train_agent(env, episodes=episodes, eval_interval=eval_interval)
+
+    # Create initial schedule
+    print("\nScheduling shifts using the trained policy...")
+    env.reset_assignments()
+    valid_assignments = create_initial_schedule(env)
+    print(f"Initial Schedule: {valid_assignments}/{len(shifts)} shifts assigned.")
+
+    # Simulate cancellations
+    cancelled_shifts = simulate_cancellations(env, cancellation_rate=0.3)
+    print(f"Simulated cancellations: {len(cancelled_shifts)} shifts cancelled.")
+
+    # Handle replacements
+    replacements = handle_cancelled_shifts(env, cancelled_shifts)
+    print(f"Replacements found for {replacements} out of {len(cancelled_shifts)} cancelled shifts.")
+
+    # Report results
+    results = generate_simulation_results(env, valid_assignments, cancelled_shifts, replacements)
+    print_final_results(env.employees, env.shifts, results)
+    
+    return results
+
+def create_initial_schedule(env):
+    """Create initial schedule using trained policy."""
+    valid_assignments = 0
+    for shift in env.shifts:
+        chosen_emp = get_best_employee_for_shift(env, shift)
+        if assign_employee_to_shift(shift, chosen_emp):
+            valid_assignments += 1
+    return valid_assignments
+
+def assign_employee_to_shift(shift, employee):
+    """Assign employee to shift if they have required skill and availability."""
+    is_valid = (shift.required_skill in employee.skills) and employee.is_available(shift.day)
+    if is_valid:
+        shift.assigned_employee = employee
+        employee.assigned_shifts.append(shift)
+    return is_valid
+
+def simulate_cancellations(env, cancellation_rate=0.3):
+    """Simulate employee cancellations with specified rate."""
+    cancelled_shifts = []
+    for shift in env.shifts:
+        if shift.assigned_employee and random.random() < cancellation_rate:
+            employee = shift.assigned_employee
+            handle_cancellation(shift, employee)
+            cancelled_shifts.append(shift)
+    return cancelled_shifts
+
+def handle_cancellation(shift, employee):
+    """Process an employee cancellation."""
+    employee.points -= 10
+    employee.assigned_shifts.remove(shift)
+    shift.assigned_employee = None
+
+def handle_cancelled_shifts(env, cancelled_shifts):
+    """Find replacements for cancelled shifts."""
+    replacements = 0
+    for shift in cancelled_shifts:
+        replacement = recommend_replacement(shift, env.employees, env.policy_net)
+        if replacement:
+            shift.assigned_employee = replacement
+            replacement.assigned_shifts.append(shift)
+            replacements += 1
+    return replacements
+
+def generate_simulation_results(env, valid_assignments, cancelled_shifts, replacements):
+    """Generate comprehensive results from simulation."""
+    final_coverage = sum(1 for s in env.shifts if s.assigned_employee is not None)
+    workloads = [len(emp.assigned_shifts) for emp in env.employees]
+    
+    return {
+        "n_employees": len(env.employees),
+        "n_shifts": len(env.shifts),
+        "initial_coverage": valid_assignments/len(env.shifts),
+        "final_coverage": final_coverage/len(env.shifts),
+        "cancellations": len(cancelled_shifts),
+        "replacements": replacements,
+        "workload_std": np.std(workloads),
+        "workloads": workloads
+    }
+
+def print_final_results(employees, shifts, results):
+    """Print final simulation results."""
+    final_coverage = int(results["final_coverage"] * len(shifts))
+    print("\n=== Final Results ===")
+    print(f"Total Shifts: {len(shifts)}")
+    print(f"Final Coverage: {final_coverage}/{len(shifts)} ({results['final_coverage']*100:.1f}%)")
+    for emp in employees:
+        print(f"{emp.name}: {len(emp.assigned_shifts)} shifts, Points: {emp.points}, "
+              f"Reliability: {emp.reliability}")
 
 # ----------------------------
 # ML-Based Replacement Ranking
@@ -344,98 +512,6 @@ def generate_shifts(n=10):
         shifts.append(Shift(i, day, time, required_skill))
     return shifts
 
-# ----------------------------
-# Main Flow
-# ----------------------------
-def run_simulation(n_employees=8, n_shifts=20, episodes=5000, eval_interval=50):
-    """
-    Run a complete shift scheduling simulation with specified parameters.
-    
-    Args:
-        n_employees: Number of employees to generate
-        n_shifts: Number of shifts to generate
-        episodes: Number of training episodes
-        eval_interval: Interval for evaluation during training
-        
-    Returns:
-        dict: Results including coverage, workloads, and other metrics
-    """
-    # Generate synthetic employees and shifts
-    employees = generate_employees(n=n_employees)
-    shifts = generate_shifts(n=n_shifts)
-
-    # Initialize policy network and optimizer
-    policy_net = PolicyNetwork()
-    optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
-
-    # Create RL environment
-    env = ShiftSchedulingEnv(employees, shifts, policy_net, optimizer)
-
-    print(f"Training RL policy for {n_employees} employees and {n_shifts} shifts...")
-    train_agent(env, episodes=episodes, eval_interval=eval_interval)
-
-    # Use the trained policy to schedule shifts deterministically
-    print("\nScheduling shifts using the trained policy...")
-    env.reset_assignments()
-    for shift in shifts:
-        scores = []
-        for emp in employees:
-            feat = get_feature_vector(shift, emp, len(emp.assigned_shifts))
-            feat_tensor = torch.tensor(feat, dtype=torch.float32)
-            score = policy_net(feat_tensor)
-            scores.append(score)
-        scores_tensor = torch.stack(scores).squeeze()
-        best_action = torch.argmax(scores_tensor).item()
-        chosen_emp = employees[best_action]
-        if (shift.required_skill in chosen_emp.skills) and chosen_emp.is_available(shift.day):
-            shift.assigned_employee = chosen_emp
-            chosen_emp.assigned_shifts.append(shift)
-    valid_assignments = sum(1 for s in shifts if s.assigned_employee is not None)
-    print(f"Initial Schedule: {valid_assignments}/{len(shifts)} shifts assigned.")
-
-    # Simulate Cancellations
-    cancellation_rate = 0.3  # 30% chance for each shift to cancel
-    cancelled_shifts = []
-    for shift in shifts:
-        if shift.assigned_employee and random.random() < cancellation_rate:
-            shift.assigned_employee.points -= 10
-            shift.assigned_employee.assigned_shifts.remove(shift)
-            shift.assigned_employee = None
-            cancelled_shifts.append(shift)
-    print(f"Simulated cancellations: {len(cancelled_shifts)} shifts cancelled.")
-
-    # Use ML-based ranking to replace cancelled shifts
-    replacements = 0
-    for shift in cancelled_shifts:
-        replacement = recommend_replacement(shift, employees, policy_net)
-        if replacement:
-            shift.assigned_employee = replacement
-            replacement.assigned_shifts.append(shift)
-            replacements += 1
-    print(f"Replacements found for {replacements} out of {len(cancelled_shifts)} cancelled shifts.")
-
-    # Final Reporting
-    final_coverage = sum(1 for s in shifts if s.assigned_employee is not None)
-    workloads = [len(emp.assigned_shifts) for emp in employees]
-    
-    print("\n=== Final Results ===")
-    print(f"Total Shifts: {len(shifts)}")
-    print(f"Final Coverage: {final_coverage}/{len(shifts)} ({(final_coverage/len(shifts))*100:.1f}%)")
-    for emp in employees:
-        print(f"{emp.name}: {len(emp.assigned_shifts)} shifts, Points: {emp.points}, Reliability: {emp.reliability}")
-    
-    # Return results for analysis
-    return {
-        "n_employees": n_employees,
-        "n_shifts": n_shifts,
-        "initial_coverage": valid_assignments/len(shifts),
-        "final_coverage": final_coverage/len(shifts),
-        "cancellations": len(cancelled_shifts),
-        "replacements": replacements,
-        "workload_std": np.std(workloads),
-        "workloads": workloads
-    }
-
 if __name__ == "__main__":
     # Set seeds for reproducibility
     random.seed(42)
@@ -446,8 +522,8 @@ if __name__ == "__main__":
     results = []
     
     # Test with varying number of employees
-    for n_emp in range(5, 6):
-        result = run_simulation(n_employees=n_emp, n_shifts=30)
+    for n_emp in range(8, 9):
+        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=500, eval_interval=50)
         results.append(result)
     
     # Test with varying number of shifts
