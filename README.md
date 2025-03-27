@@ -1,120 +1,258 @@
 
 ![ShiftScheduler drawio](https://github.com/user-attachments/assets/87b83b80-94c5-4196-84c0-1dfe778f10fb)
 
-# Reinforcement Learning for Shift Scheduling
+<div id="top">
 
-This project implements a reinforcement learning (RL) approach to automate employee shift scheduling. It uses a policy gradient method (REINFORCE) to train a neural network that learns optimal assignment strategies based on employee skills, availability, and workload balancing. The system also simulates real-world scenarios like shift cancellations and uses the trained policy to recommend replacements.
+<!-- HEADER STYLE: CLASSIC -->
+<div align="center">
+
+<img src="readmeai/assets/logos/purple.svg" width="30%" style="position: relative; top: 0; right: 0;" alt="Project Logo"/>
+
+# WORKSHIFT-RECOMMENDATION-ENGINE.GIT
+
+<em></em>
+
+<!-- BADGES -->
+<img src="https://img.shields.io/github/license/TheAp0cryphal/Workshift-Recommendation-Engine.git?style=default&logo=opensourceinitiative&logoColor=white&color=0080ff" alt="license">
+<img src="https://img.shields.io/github/last-commit/TheAp0cryphal/Workshift-Recommendation-Engine.git?style=default&logo=git&logoColor=white&color=0080ff" alt="last-commit">
+<img src="https://img.shields.io/github/languages/top/TheAp0cryphal/Workshift-Recommendation-Engine.git?style=default&color=0080ff" alt="repo-top-language">
+<img src="https://img.shields.io/github/languages/count/TheAp0cryphal/Workshift-Recommendation-Engine.git?style=default&color=0080ff" alt="repo-language-count">
+
+<!-- default option, no dependency badges. -->
+
+
+<!-- default option, no dependency badges. -->
+
+</div>
+<br>
+
+---
 
 ## Table of Contents
 
-* [Overview](#overview)
-* [Key Features](#key-features)
-* [Getting Started](#getting-started)
-    * [Prerequisites](#prerequisites)
-    * [Installation](#installation)
-* [Usage](#usage)
-    * [Running the Simulation](#running-the-simulation)
-    * [Customizing the Simulation](#customizing-the-simulation)
-* [Project Structure](#project-structure)
-* [Data Models](#data-models)
-* [Feature Encoding](#feature-encoding)
-* [Policy Network](#policy-network)
-* [Reinforcement Learning Environment](#reinforcement-learning-environment)
-* [Evaluation and Metrics](#evaluation-and-metrics)
-* [Shift Cancellation and Replacement](#shift-cancellation-and-replacement)
-* [Results and Visualizations](#results-and-visualizations)
-* [Future Enhancements](#future-enhancements)
-* [Contributing](#contributing)
-* [License](#license)
+- [Table of Contents](#table-of-contents)
+- [Overview](#overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+    - [Project Index](#project-index)
+- [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Usage](#usage)
+    - [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+---
 
 ## Overview
 
-The goal of this project is to develop an intelligent system that can efficiently and fairly assign employees to shifts. By using reinforcement learning, the system learns from its past experiences to make better scheduling decisions over time, aiming to maximize shift coverage, balance employee workloads, and ensure that the required skills are matched with the demands of each shift. The project also incorporates a simulation of shift cancellations and a mechanism to find suitable replacements using the trained RL policy.
 
-## Key Features
 
-* **Automated Shift Scheduling:** Uses a trained policy network to assign employees to shifts.
-* **Reinforcement Learning:** Employs the REINFORCE algorithm to train the scheduling policy.
-* **Skill and Availability Matching:** Ensures that assigned employees possess the required skills and are available for the shift.
-* **Workload Balancing:** Encourages a fair distribution of shifts among employees.
-* **Shift Cancellation Simulation:** Simulates realistic scenarios where employees may cancel their assigned shifts.
-* **Intelligent Replacement Recommendation:** Uses the trained policy to find the best available replacement for cancelled shifts.
-* **Performance Evaluation:** Tracks key metrics such as shift coverage, workload standard deviation, and skill match rate.
-* **Visualizations:** Generates plots to monitor the training progress and evaluation metrics.
-* **Synthetic Data Generation:** Includes functions to create sample employee and shift data for experimentation.
-* **Basic Cancellation Detection:** Integrates with a placeholder NLP module to detect cancellations from text messages.
+---
+
+## Features
+
+<code>❯ REPLACE-ME</code>
+
+---
+
+## Project Structure
+
+```sh
+└── Workshift-Recommendation-Engine.git/
+    ├── README.md
+    └── recommendation_engine
+        ├── evaluation_metrics.png
+        ├── main.py
+        ├── nlp_module.py
+        ├── plots
+        ├── requirements.txt
+        └── training_rewards.png
+```
+
+### Project Index
+
+<details open>
+	<summary><b><code>WORKSHIFT-RECOMMENDATION-ENGINE.GIT/</code></b></summary>
+	<!-- __root__ Submodule -->
+	<details>
+		<summary><b>__root__</b></summary>
+		<blockquote>
+			<div class='directory-path' style='padding: 8px 0; color: #666;'>
+				<code><b>⦿ __root__</b></code>
+			<table style='width: 100%; border-collapse: collapse;'>
+			<thead>
+				<tr style='background-color: #f8f9fa;'>
+					<th style='width: 30%; text-align: left; padding: 8px;'>File Name</th>
+					<th style='text-align: left; padding: 8px;'>Summary</th>
+				</tr>
+			</thead>
+			</table>
+		</blockquote>
+	</details>
+	<!-- recommendation_engine Submodule -->
+	<details>
+		<summary><b>recommendation_engine</b></summary>
+		<blockquote>
+			<div class='directory-path' style='padding: 8px 0; color: #666;'>
+				<code><b>⦿ recommendation_engine</b></code>
+			<table style='width: 100%; border-collapse: collapse;'>
+			<thead>
+				<tr style='background-color: #f8f9fa;'>
+					<th style='width: 30%; text-align: left; padding: 8px;'>File Name</th>
+					<th style='text-align: left; padding: 8px;'>Summary</th>
+				</tr>
+			</thead>
+				<tr style='border-bottom: 1px solid #eee;'>
+					<td style='padding: 8px;'><b><a href='https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git/blob/master/recommendation_engine/nlp_module.py'>nlp_module.py</a></b></td>
+					<td style='padding: 8px;'>- The <code>nlp_module.py</code> file provides a sentiment analysis function for the recommendation engine<br>- It leverages a pre-trained model to classify employee messages as positive or negative<br>- This functionality likely aids in predicting employee reliability or satisfaction, contributing to improved shift scheduling and resource allocation within the larger application.</td>
+				</tr>
+				<tr style='border-bottom: 1px solid #eee;'>
+					<td style='padding: 8px;'><b><a href='https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git/blob/master/recommendation_engine/requirements.txt'>requirements.txt</a></b></td>
+					<td style='padding: 8px;'>- Requirements.txt` specifies the necessary Python libraries for the recommendation engine<br>- It ensures the engines functionality by defining dependencies for numerical computation (NumPy), data visualization (Matplotlib), deep learning (PyTorch), and natural language processing (Transformers)<br>- These libraries are crucial for building and running the recommendation system within the broader project architecture.</td>
+				</tr>
+				<tr style='border-bottom: 1px solid #eee;'>
+					<td style='padding: 8px;'><b><a href='https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git/blob/master/recommendation_engine/main.py'>main.py</a></b></td>
+					<td style='padding: 8px;'>Code>❯ REPLACE-ME</code></td>
+				</tr>
+			</table>
+		</blockquote>
+	</details>
+</details>
+
+---
 
 ## Getting Started
 
-## Prerequisites
-Install requirements.txt using `pip install -r requirements.txt`
+### Prerequisites
 
-To run the default simulation:
-`python main.py`
+This project requires the following dependencies:
 
-## Execution Flow
-Generate synthetic employee and shift data.\
-Initialize the policy network and optimizer.\
-Train the RL agent for a specified number of episodes.\
-Create an initial schedule using the trained policy.\
-Simulate shift cancellations.\
-Attempt to find replacements for the cancelled shifts.\
-Print the final results, including coverage and workload distribution.\
-Save plots of the training progress and evaluation metrics in a plots directory.\
+- **Programming Language:** Python
+- **Package Manager:** Pip
 
-## Project Structure
-### The project consists of a single Python file containing the following main components:
+### Installation
 
-#### Global Settings and Constants: Defines lists of days, times, and skills.\
-Data Models: Classes for Employee and Shift to represent the entities involved in scheduling.\
-Feature Encoding Functions: Functions to convert Shift and Employee objects into numerical feature vectors.\
-Policy Network: A PyTorch neural network that learns the scheduling policy.\
-RL Environment and Training: The ShiftSchedulingEnv class manages the scheduling process, reward calculation, and policy updates.\
-Additional Visualizations and Metrics: Functions to evaluate the policy and generate plots of training progress.\
-Shift Cancellation and Replacement: Functions to simulate cancellations and recommend replacements.\
-Synthetic Data Generation: Functions to create random employee and shift data.\
-Main Execution Block: Sets up and runs the simulation with specified parameters.\
+Build Workshift-Recommendation-Engine.git from the source and intsall dependencies:
 
-#### Data Models
-Employee: Represents an employee with attributes such as id, name, skills, availability, reliability, points, and assigned_shifts.\
-Shift: Represents a shift with attributes such as id, day, time, required_skill, and assigned_employee.\
-Feature Encoding:
-The project uses one-hot encoding to represent categorical features like days, times, and skills. Employee features also include workload, reliability, and points. These encoded features are then used as input to the policy network.\
+1. **Clone the repository:**
 
-Policy Network
-The PolicyNetwork is a simple feedforward neural network with one hidden layer. It takes the concatenated feature vectors of a shift and an employee as input and outputs a scalar score representing the suitability of assigning that employee to the shift.\
+    ```sh
+    ❯ git clone https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git
+    ```
 
-Reinforcement Learning Environment
-The ShiftSchedulingEnv manages the interaction between the RL agent (policy network) and the scheduling task. It handles:\
+2. **Navigate to the project directory:**
 
-Resetting assignments.\
-Calculating rewards for assigning employees to shifts based on validity, workload balance, and overtime.\
-Running episodes where shifts are assigned in a randomized order.\
-Updating the policy network using the REINFORCE algorithm based on the rewards received.\
-Evaluation and Metrics\
-The project evaluates the performance of the trained policy using the following metrics:\
+    ```sh
+    ❯ cd Workshift-Recommendation-Engine.git
+    ```
 
-Total Reward: The cumulative reward obtained during training episodes.\
-Shift Coverage: The percentage of shifts that are successfully assigned to an employee.\
-Workload Standard Deviation: A measure of how evenly the shifts are distributed among employees. A lower standard deviation indicates a more balanced workload.\
-Average Skill Match: The percentage of assigned shifts where the employee's skills match the required skills.\
-These metrics are tracked during training and plotted to visualize the learning progress.\
+3. **Install the dependencies:**
 
-Shift Cancellation and Replacement
-The simulation includes a basic mechanism for shift cancellations. Employees assigned to shifts might cancel based on messages (detected using the classify_text function). When a cancellation occurs, the system uses the trained policy network to recommend the best available replacement employee who meets the shift requirements.\
+<!-- SHIELDS BADGE CURRENTLY DISABLED -->
+	<!-- [![pip][pip-shield]][pip-link] -->
+	<!-- REFERENCE LINKS -->
+	<!-- [pip-shield]: https://img.shields.io/badge/Pip-3776AB.svg?style={badge_style}&logo=pypi&logoColor=white -->
+	<!-- [pip-link]: https://pypi.org/project/pip/ -->
 
-Results and Visualizations
-After training, the script will print the final simulation results, including the final shift coverage and workload distribution. It will also save the following plots in a plots directory:\
+	**Using [pip](https://pypi.org/project/pip/):**
 
-training_rewards.png: Shows the average reward obtained per evaluation interval during training.\
-evaluation_metrics.png: Displays plots of evaluation reward, shift coverage, workload standard deviation, and average skill match over the training episodes.\
+	```sh
+	❯ pip install -r recommendation_engine/requirements.txt
+	```
 
-Future Enhancements
-More Sophisticated NLP for Cancellation Detection: Integrate a more robust NLP model for accurately detecting cancellations from various message formats.\
-Consider Employee Preferences: Incorporate employee preferences (e.g., preferred days or times) into the reward function or policy network.\
-Handle Partial Availability: Allow employees to have more granular availability (e.g., available only in the morning on a specific day).\
-Dynamic Shift Requirements: Implement scenarios where shift requirements might change dynamically.\
-Integration with Real-World Data: Adapt the system to work with real employee and shift data from a scheduling platform.\
-More Advanced RL Algorithms: Explore the use of more advanced RL algorithms like Actor-Critic methods (e.g., A2C, A3C) for potentially faster and more stable learning.\
-GUI or Web Interface: Develop a user interface to visualize the schedule and allow for manual adjustments.\
+### Usage
 
+Run the project with:
+
+**Using [pip](https://pypi.org/project/pip/):**
+```sh
+python {entrypoint}
+```
+
+### Testing
+
+Workshift-recommendation-engine.git uses the {__test_framework__} test framework. Run the test suite with:
+
+**Using [pip](https://pypi.org/project/pip/):**
+```sh
+pytest
+```
+
+---
+
+## Roadmap
+
+- [X] **`Task 1`**: <strike>Implement feature one.</strike>
+- [ ] **`Task 2`**: Implement feature two.
+- [ ] **`Task 3`**: Implement feature three.
+
+---
+
+## Contributing
+
+- **💬 [Join the Discussions](https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git/discussions)**: Share your insights, provide feedback, or ask questions.
+- **🐛 [Report Issues](https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git/issues)**: Submit bugs found or log feature requests for the `Workshift-Recommendation-Engine.git` project.
+- **💡 [Submit Pull Requests](https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git/blob/main/CONTRIBUTING.md)**: Review open PRs, and submit your own PRs.
+
+<details closed>
+<summary>Contributing Guidelines</summary>
+
+1. **Fork the Repository**: Start by forking the project repository to your github account.
+2. **Clone Locally**: Clone the forked repository to your local machine using a git client.
+   ```sh
+   git clone https://github.com/TheAp0cryphal/Workshift-Recommendation-Engine.git
+   ```
+3. **Create a New Branch**: Always work on a new branch, giving it a descriptive name.
+   ```sh
+   git checkout -b new-feature-x
+   ```
+4. **Make Your Changes**: Develop and test your changes locally.
+5. **Commit Your Changes**: Commit with a clear message describing your updates.
+   ```sh
+   git commit -m 'Implemented new feature x.'
+   ```
+6. **Push to github**: Push the changes to your forked repository.
+   ```sh
+   git push origin new-feature-x
+   ```
+7. **Submit a Pull Request**: Create a PR against the original project repository. Clearly describe the changes and their motivations.
+8. **Review**: Once your PR is reviewed and approved, it will be merged into the main branch. Congratulations on your contribution!
+</details>
+
+<details closed>
+<summary>Contributor Graph</summary>
+<br>
+<p align="left">
+   <a href="https://github.com{/TheAp0cryphal/Workshift-Recommendation-Engine.git/}graphs/contributors">
+      <img src="https://contrib.rocks/image?repo=TheAp0cryphal/Workshift-Recommendation-Engine.git">
+   </a>
+</p>
+</details>
+
+---
+
+## License
+
+Workshift-recommendation-engine.git is protected under the [LICENSE](https://choosealicense.com/licenses) License. For more details, refer to the [LICENSE](https://choosealicense.com/licenses/) file.
+
+---
+
+## Acknowledgments
+
+- Credit `contributors`, `inspiration`, `references`, etc.
+
+<div align="right">
+
+[![][back-to-top]](#top)
+
+</div>
+
+
+[back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
+
+
+---
