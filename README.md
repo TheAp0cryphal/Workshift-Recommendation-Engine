@@ -180,26 +180,20 @@ The simulation follows these steps:
 ### Dependencies
 
 The project requires the following:
-
--   Python 3.x
-
--   PyTorch
-
--   NumPy
-
--   Matplotlib
-
--   An NLP module (`nlp_module`) for classifying cancellation messages
+- matplotlib==3.10.1
+- numpy==2.2.4
+- torch==2.6.0
+- transformers==4.50.0
 
 ### Running the Simulation
 
 1.  Install all dependencies.
 
 2.  Execute the main script (for example,
-    `shift_scheduling_simulation.py`) by running:
+    `main.py`) by running:
 
     ``` {.bash language="bash"}
-    python shift_scheduling_simulation.py
+    python main.py
     ```
 
 3.  The script will train the RL policy, generate plots in the `plots`
