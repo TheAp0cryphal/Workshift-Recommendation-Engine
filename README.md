@@ -1,4 +1,4 @@
-![ShiftScheduler drawio](https://github.com/user-attachments/assets/68be77d6-0d71-4590-a83e-49414e6525cc)
+![ShiftScheduler drawio](https://github.com/user-attachments/assets/b717ff29-5ed1-4d94-a32a-fd06eba29023)
 
 # Shift Scheduling Simulation: Project Documentation
 
