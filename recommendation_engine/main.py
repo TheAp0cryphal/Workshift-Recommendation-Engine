@@ -566,30 +566,24 @@ def detect_cancellation(message):
     return not classify_text(message)
 
 if __name__ == "__main__":
+    import argparse
+    
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Run shift scheduling simulation')
+    parser.add_argument('--employees', type=int, default=15, help='Number of employees')
+    parser.add_argument('--shifts', type=int, default=30, help='Number of shifts')
+    args = parser.parse_args()
+
     # Set seeds for reproducibility
     random.seed(42)
     np.random.seed(42)
     torch.manual_seed(42)
 
-    # Test with different combinations of employees and shifts
-    results = []
+    # Run simulation with provided parameters
+    result = run_simulation(n_employees=args.employees, n_shifts=args.shifts, episodes=10000, eval_interval=250)
     
-    # Test with varying number of employees
-    for n_emp in range(11,12):
-        result = run_simulation(n_employees=n_emp, n_shifts=30, episodes=10000, eval_interval=250)
-        results.append(result)
-    
-    # Test with varying number of shifts
-    # for n_shifts in [10, 15, 20, 25, 30]:
-    #    result = run_simulation(n_employees=8, n_shifts=n_shifts)
-    #    results.append(result)
-    
-    # Compare results
-    print("\n=== Comparative Results ===")
-    print("Employee Scaling:")
-    for r in results[:6]:
-        print(f"Employees: {r['n_employees']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
-    
-    # print("\nShift Scaling:")
-    # for r in results[6:]:
-    #    print(f"Shifts: {r['n_shifts']}, Final Coverage: {r['final_coverage']*100:.1f}%, Workload STD: {r['workload_std']:.2f}")
+    # Print results
+    print("\n=== Simulation Results ===")
+    print(f"Employees: {args.employees}, Shifts: {args.shifts}")
+    print(f"Final Coverage: {result['final_coverage']*100:.1f}%")
+    print(f"Workload STD: {result['workload_std']:.2f}")
