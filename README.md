@@ -195,11 +195,4 @@ The project requires the following:
 3.  The script will train the RL policy, generate plots in the `plots`
     directory, and print the simulation results.
 
-# Conclusion
-
-This project demonstrates a reinforcement learning approach to solving
-the shift scheduling problem by incorporating employee characteristics,
-skill requirements, and dynamic adjustments for cancellations. Its
-modular design allows for easy maintenance and future improvements, such
-as more sophisticated cancellation detection and adaptive scheduling
-strategies.
+[RL_Shift_Scheduling_Presentation.pdf](https://github.com/user-attachments/files/19698129/RL_Shift_Scheduling_Presentation.pdf)
