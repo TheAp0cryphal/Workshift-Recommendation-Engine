@@ -2,7 +2,7 @@
 Functions for encoding shifts and employees into feature vectors.
 """
 import numpy as np
-from recommendation_engine.constants import DAYS, TIMES, SKILLS
+from recommendation_engine.core.constants import DAYS, TIMES, SKILLS
 
 def encode_shift(shift):
     """

@@ -1,11 +1,11 @@
 """
-Reinforcement Learning environment for shift scheduling.
+Environment module for recommendation engine's RL-based shift scheduling.
 """
-import random
-import numpy as np
-import torch
+import torch 
 import torch.nn.functional as F
-from recommendation_engine.feature_encoding import get_feature_vector
+import numpy as np
+import random
+from recommendation_engine.data.feature_encoding import get_feature_vector
 
 class ShiftSchedulingEnv:
     def __init__(self, employees, shifts, policy_net, optimizer):

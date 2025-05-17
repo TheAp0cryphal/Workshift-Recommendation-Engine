@@ -8,7 +8,7 @@ import argparse
 import matplotlib
 matplotlib.use('Agg')  # Set Agg backend for matplotlib (for WSL)
 
-from recommendation_engine.simulation import run_simulation
+from recommendation_engine.simulation.simulation import run_simulation
 
 if __name__ == "__main__":
     # Set up argument parser

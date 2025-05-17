@@ -4,7 +4,7 @@ Neural network model for the policy network.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from recommendation_engine.constants import DAYS, TIMES, SKILLS
+from recommendation_engine.core.constants import DAYS, TIMES, SKILLS
 
 class PolicyNetwork(nn.Module):
     def __init__(self, input_dim=(len(DAYS)+len(TIMES)+len(SKILLS)) + (len(SKILLS)+len(DAYS)+3), hidden_dim=32):

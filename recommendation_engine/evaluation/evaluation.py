@@ -3,7 +3,7 @@ Evaluation and metrics functions for the recommendation engine.
 """
 import numpy as np
 import torch
-from recommendation_engine.feature_encoding import get_feature_vector
+from recommendation_engine.data.feature_encoding import get_feature_vector
 
 def evaluate_policy(env):
     """Evaluate the trained policy"""

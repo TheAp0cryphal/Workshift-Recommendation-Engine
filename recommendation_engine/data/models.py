@@ -1,7 +1,7 @@
 """
 Data models for the recommendation engine.
 """
-from recommendation_engine.constants import DAYS
+from recommendation_engine.core.constants import DAYS
 
 class Employee:
     def __init__(self, emp_id, name, skills, availability, reliability=0.9):

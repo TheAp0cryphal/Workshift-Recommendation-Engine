@@ -7,13 +7,13 @@ import torch.optim as optim
 import sys
 import select
 
-from recommendation_engine.data_generator import generate_employees, generate_shifts
-from recommendation_engine.policy_network import PolicyNetwork
-from recommendation_engine.environment import ShiftSchedulingEnv
-from recommendation_engine.evaluation import evaluate_policy, get_best_employee_for_shift, assign_employee_to_shift, track_training_progress, evaluate_and_log_progress
-from recommendation_engine.visualization import plot_training_metrics
-from recommendation_engine.feature_encoding import get_feature_vector
-from recommendation_engine.nlp_module import classify_text
+from recommendation_engine.data.data_generator import generate_employees, generate_shifts
+from recommendation_engine.models.policy_network import PolicyNetwork
+from recommendation_engine.core.environment import ShiftSchedulingEnv
+from recommendation_engine.evaluation.evaluation import evaluate_policy, get_best_employee_for_shift, assign_employee_to_shift, track_training_progress, evaluate_and_log_progress
+from recommendation_engine.visualization.visualization import plot_training_metrics
+from recommendation_engine.data.feature_encoding import get_feature_vector
+from recommendation_engine.utils.nlp_module import classify_text
 
 def train_agent(env, episodes=500, eval_interval=50):
     """Train the policy network."""
@@ -152,6 +152,7 @@ def run_simulation(n_employees=8, n_shifts=20, episodes=500, eval_interval=50):
     # Reset assignments to ensure no shifts are assigned before creating initial schedule
     env.reset_assignments() 
     # Test the trained policy on how well it schedules shifts
+
     valid_assignments = test_trained_policy(env)
     print(f"Initial Schedule: {valid_assignments}/{len(shifts)} shifts assigned.")
 
