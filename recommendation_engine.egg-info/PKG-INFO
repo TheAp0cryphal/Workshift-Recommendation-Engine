@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: recommendation_engine
+Version: 0.1
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: torch
+Requires-Dist: transformers
+Dynamic: requires-dist
